@@ -179,10 +179,12 @@ val distribuisciBundle = tasks.register<Sync>("distribuisciBundle") {
     val nome = "timbro-0.1.$gitCommitCount.aab"  // calcolato qui: la lambda non deve tirarsi dietro lo script
     rename { nome }
 }
-val indirizziMancanti = apiBase == null || enrollBase == null  // calcolato qui: la lambda non si tira dietro lo script
+val indirizziMancanti = apiBase == null || enrollBase == null
 tasks.matching { it.name == "bundleRelease" || it.name == "assembleRelease" }.configureEach {
+    // copia locale: un valore dello script dentro doFirst si porta dietro lo script, che la configuration cache rifiuta
+    val mancanti = indirizziMancanti
     doFirst {
-        if (indirizziMancanti) {
+        if (mancanti) {
             throw GradleException("indirizzi del server mancanti: android/server.properties (apiBase, enrollBase) o -Ptimbro.apiBase/-Ptimbro.enrollBase")
         }
     }

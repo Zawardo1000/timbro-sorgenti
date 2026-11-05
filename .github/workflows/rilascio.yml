@@ -12,6 +12,8 @@ name: Rilascio
 on:
   push:
     tags: ["timbro-*"]
+  # rilancio a mano: "Run workflow" scegliendo il tag timbro-* in "Use workflow from" (l'ambiente accetta solo quelli)
+  workflow_dispatch:
 
 permissions: {}
 
