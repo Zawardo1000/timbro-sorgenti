@@ -1,0 +1,298 @@
+{#- Schede informative della pagina pubblica: popover nativi, nessuno script. Testi generali, uguali per tutti i
+    link. Riferimenti normativi da docs/PROGETTO.md §3 (da far rivedere a un legale prima dell'uso in giudizio). -#}
+{% macro close(id) %}<button class="btn close" type="button" popovertarget="info-{{ id }}" popovertargetaction="hide">Chiudi</button>{% endmacro %}
+
+<div popover id="info-inalterabili" role="dialog" aria-labelledby="info-inalterabili-t">
+  <h2 id="info-inalterabili-t">Perché i dati non si possono alterare</h2>
+  <p>Ogni timbratura è protetta da più garanzie indipendenti, una sopra l'altra. Per cambiarla senza che si veda
+  bisognerebbe superarle tutte insieme, e alcune non dipendono né da chi timbra né da chi gestisce questo sistema.</p>
+  <h3>1. Sigillata nel telefono, al momento della ripresa</h3>
+  <p>Il video nasce dentro l'app: non si possono caricare file dalla galleria. Appena la ripresa finisce, il telefono
+  calcola l'impronta del video e firma un <em>manifest</em> con impronta, entrata o uscita, ora e posizione. La
+  chiave che firma è custodita dall'hardware sicuro del telefono e non può esserne estratta: nessuno, nemmeno chi
+  usa il telefono, può firmare al suo posto un manifest diverso.</p>
+  <h3>2. Google certifica il telefono e l'app</h3>
+  <p>A ogni timbratura il chip sicuro rilascia un'attestazione con una catena di certificati che risale alle radici di
+  Google. Dice che il telefono è integro (bootloader bloccato, sistema originale, senza permessi di amministratore)
+  e quale app ha timbrato, in quale versione e con quale firma.</p>
+  <p>L'app arriva da Google Play, che la firma con una chiave custodita da Google: chi ha sviluppato l'app ha solo
+  una chiave per caricarla sullo store e non può produrre quella firma. Una copia ricompilata o installata da altre
+  fonti avrebbe una firma diversa, e l'attestazione lo mostrerebbe. Ogni versione pubblicata ha un numero proprio,
+  indicato per ogni timbratura.</p>
+  <h3>3. Datata da prestatori indipendenti</h3>
+  <p>Entro pochi secondi il video, il record della timbratura e l'attestazione ricevono marche temporali da due
+  prestatori qualificati eIDAS e una prova sulla blockchain Bitcoin. Le marche qualificate sono presunte esatte nella data e nell'ora e garantiscono l'integrità dei dati
+  marcati (art. 41 eIDAS): una timbratura non si può retrodatare né cambiare dopo.</p>
+  <h3>4. Legata alle altre</h3>
+  <p>Ogni timbratura è un anello di una catena che comprende tutte le precedenti, e l'ultimo anello di ogni giorno è
+  marcato a sua volta, ogni notte. Togliere, aggiungere o riordinare timbrature di un giorno marcato spezzerebbe la
+  catena, anche se lo facesse chi gestisce il server.</p>
+  <h3>5. Verificabile senza fidarsi di nessuno</h3>
+  <p>Il pacchetto di prova contiene tutto quello che serve per ripetere ogni controllo su un computer qualsiasi,
+  senza passare da questo server: uno script Python che verifica tutto da solo, oppure programmi liberi
+  (<code>openssl</code>, <code>ots</code>).</p>
+  <h3>Cosa prova e cosa no</h3>
+  <p>La prova riguarda la ripresa: che l'ha fatta questo telefono, con l'app originale, in quel luogo e a quell'ora, e
+  che da allora non è cambiata. Che davanti alla fotocamera ci fosse il terminale dell'ente lo mostra il video
+  stesso, insieme alla posizione e alle reti Wi-Fi della sede; che il badge fosse in mano al suo titolare non lo
+  prova, come non lo prova il terminale.</p>
+  <h3>Chi potrebbe alterare cosa</h3>
+  <ul>
+    <li><b>Chi timbra</b>: dopo la ripresa non può cambiare il video, l'ora o il tipo di timbratura, perché firma e marche
+    non corrisponderebbero più. Prima della ripresa può solo spostare l'orologio del telefono, e lo smentiscono gli
+    orologi di rete e satellitare e la ricezione. Un telefono modificato o un'app diversa farebbero fallire
+    l'attestazione.</li>
+    <li><b>Chi gestisce il server</b>: non ha la chiave del telefono, quindi non può creare né modificare timbrature
+    firmate da quel telefono, né retrodatarle. Può solo ometterne: non le riceve, oppure le toglie prima della marca
+    notturna della giornata (dopo, la catena lo rivelerebbe). Un'omissione non fa comparire presenze che non ci
+    sono state.</li>
+    <li><b>I prestatori delle marche</b>: ricevono solo impronte, mai i dati, e sono due, indipendenti tra loro, più la blockchain Bitcoin.</li>
+  </ul>
+  {{ close("inalterabili") }}
+</div>
+
+<div popover id="info-video" role="dialog" aria-labelledby="info-video-t">
+  <h2 id="info-video-t">Perché il video non è alterato</h2>
+  <p>L'app registra al massimo 15 secondi, senza audio, inquadrando solo il display del terminale di rilevazione e il
+  badge. Non si possono caricare video dalla galleria: la ripresa nasce dentro l'app.</p>
+  <h3>Impronta calcolata subito</h3>
+  <p>Appena la registrazione si ferma, il telefono calcola l'impronta SHA-256 del file: una sequenza di 64 caratteri
+  che cambia completamente se cambia anche un solo byte del video. L'impronta entra nel <em>manifest</em> firmato
+  dal telefono e, pochi secondi dopo, riceve le marche temporali di prestatori qualificati.</p>
+  <h3>Cosa significa</h3>
+  <p>Ogni modifica successiva, anche di un solo fotogramma, produrrebbe un'impronta diversa da quella firmata e
+  marcata, e si vedrebbe. Per alterarlo bisognerebbe farlo nei pochi secondi tra la ripresa e l'impronta, dentro
+  l'app, su un telefono il cui sistema risulta integro all'attestazione hardware: non è ragionevolmente possibile.</p>
+  <h3>Come controllarlo</h3>
+  <p>Il file mostrato qui è l'originale. Chiunque può ricalcolarne l'impronta (per esempio
+  <code>openssl dgst -sha256 video.mp4</code> sul file del pacchetto di prova) e confrontarla con quella pubblicata.</p>
+  {{ close("video") }}
+</div>
+
+<div popover id="info-ora" role="dialog" aria-labelledby="info-ora-t">
+  <h2 id="info-ora-t">L'ora della timbratura</h2>
+  <p>Il telefono scrive nel manifest firmato l'ora d'inizio della ripresa. Quell'ora, però, chi usa il telefono
+  può cambiarla dalle impostazioni senza modificare nulla: per questo da sola non basta.</p>
+  <h3>Quando vale l'ora del telefono</h3>
+  <ul>
+    <li><b>Ricezione immediata</b>: la timbratura arriva al server entro due minuti e le marche temporali la datano
+    pochi secondi dopo. Un orologio spostato si vedrebbe come un ritardo.</li>
+    <li><b>Orologio di rete e satellitare</b>: insieme all'ora del telefono l'app scrive nel manifest firmato l'ora
+    della rete e quella dei satelliti GPS, che l'utente non può spostare. Se coincidono, l'ora del telefono è
+    confermata anche per le timbrature rimaste in coda senza rete.</li>
+  </ul>
+  <h3>Quando non vale</h3>
+  <p>Se un orologio indipendente la smentisce, o è avanti rispetto alla ricezione, vale l'altra ora e la pagina lo
+  dice in rosso. Se non c'è niente che la confermi (timbratura arrivata tardi, senza orologi) vale l'ora di
+  ricezione del server, che le marche temporali confermano.</p>
+  <h3>Il limite in alto</h3>
+  <p>In ogni caso la timbratura esisteva, così com'è, al più tardi all'ora delle marche temporali: nessuna
+  timbratura può essere fatta dopo quell'ora e fatta passare per precedente.</p>
+  {{ close("ora") }}
+</div>
+
+<div popover id="info-marca" role="dialog" aria-labelledby="info-marca-t">
+  <h2 id="info-marca-t">Le marche temporali</h2>
+  <p>Una marca temporale (standard RFC 3161) è un'attestazione firmata da un prestatore indipendente: «questa
+  impronta esisteva a quest'ora». Il prestatore riceve solo l'impronta, mai il video, vi associa data e ora del
+  proprio orologio sincronizzato con il tempo universale (UTC) e firma il tutto con il proprio certificato.</p>
+  <h3>Qualificate eIDAS</h3>
+  <p>I prestatori qualificati secondo il Regolamento (UE) 910/2014 (eIDAS) sono sottoposti a vigilanza e a verifiche
+  di conformità periodiche, e sono iscritti nelle Trusted List ufficiali degli Stati membri. Le marche di ogni
+  timbratura vengono da due servizi qualificati iscritti nella Trusted List spagnola:</p>
+  <ul>
+    <li><b>ACCV</b>, Agencia de Tecnología y Certificación Electrónica della Generalitat Valenciana;</li>
+    <li><b>Sectigo Qualified Time Stamping</b>.</li>
+  </ul>
+  <p>Il server controlla la Trusted List ogni settimana e ne mette una copia nel pacchetto di prova; si può
+  verificare anche sul browser ufficiale della Commissione europea (eidas.ec.europa.eu, «Trusted List Browser»).</p>
+  <h3>Più fonti indipendenti</h3>
+  <p>Oltre alle due qualificate, ogni impronta riceve una prova OpenTimestamps sulla blockchain Bitcoin, che non
+  dipende da nessun prestatore. Per mettere in dubbio l'ora bisognerebbe che sbagliassero nello stesso modo due
+  prestatori vigilati, indipendenti tra loro, e la blockchain.</p>
+  <h3>Cosa provano</h3>
+  <p>Che il video, la timbratura e la catena esistevano, così come sono, al più tardi all'ora indicata. Le marche
+  qualificate coprono il video, il record della timbratura (entrata o uscita, ora e posizione dichiarate dal telefono,
+  firma e chiave) e l'attestazione hardware, e ogni giorno l'ultimo anello della catena. Ogni marca si verifica da
+  sola con <code>openssl ts -verify</code> (istruzioni nel pacchetto di prova).</p>
+  {{ close("marca") }}
+</div>
+
+<div popover id="info-ots" role="dialog" aria-labelledby="info-ots-t">
+  <h2 id="info-ots-t">OpenTimestamps</h2>
+  <p>OpenTimestamps raccoglie molte impronte, le combina in un'unica impronta e la scrive in una transazione della
+  blockchain Bitcoin: un registro pubblico, replicato su migliaia di computer, che nessuno può modificare a
+  posteriori. La conferma arriva in qualche ora, con il primo blocco che contiene la transazione.</p>
+  <p>Non dipende da nessun prestatore né da questo server: chiunque può verificarla con il programma libero
+  <code>ots</code> e una copia della blockchain. È un rinforzo alle marche qualificate.</p>
+  {{ close("ots") }}
+</div>
+
+<div popover id="info-firma" role="dialog" aria-labelledby="info-firma-t">
+  <h2 id="info-firma-t">La firma del telefono</h2>
+  <p>Quando il telefono viene associato, genera una coppia di chiavi crittografiche (ECDSA P-256) dentro l'area
+  sicura del processore o un chip dedicato (Android Keystore). La chiave privata non può uscire da lì: nemmeno
+  l'utente o l'app possono leggerla o copiarla.</p>
+  <p>A ogni timbratura il telefono firma il <em>manifest</em>: impronta del video, entrata o uscita, ora del
+  telefono, posizione e reti Wi-Fi. Il server verifica la firma alla ricezione con la chiave pubblica registrata
+  all'associazione, e rifiuta un manifest alterato anche di un solo carattere.</p>
+  <p>È una firma elettronica (art. 3 eIDAS) non qualificata: non identifica la persona come una firma digitale, ma
+  garantisce che quei dati vengono da quel telefono e non sono stati cambiati. Manifest, firma e chiave sono nel
+  pacchetto di prova e si verificano con <code>openssl dgst -verify</code>.</p>
+  {{ close("firma") }}
+</div>
+
+<div popover id="info-attestazione" role="dialog" aria-labelledby="info-attestazione-t">
+  <h2 id="info-attestazione-t">L'attestazione hardware</h2>
+  <p>A ogni timbratura l'area sicura del telefono rilascia un certificato (Android Key Attestation) firmato da una
+  catena che risale alle radici di Google. Il certificato dice, in modo che il sistema operativo non può
+  falsificare:</p>
+  <ul>
+    <li>che la chiave è custodita dall'hardware sicuro;</li>
+    <li>che il bootloader era bloccato e il sistema avviato in modo verificato, cioè non modificato né con i permessi
+    di amministratore (root);</li>
+    <li>quale app ha chiesto l'attestazione, in quale versione e con quale certificato è firmata.</li>
+  </ul>
+  <p>L'attestazione è legata a quella timbratura: contiene l'impronta del suo manifest, quindi non si può riusare.
+  Il server la verifica fino alle radici di Google e la confronta ogni giorno con la lista di revoca pubblicata da
+  Google per le chiavi compromesse.</p>
+  <h3>La firma di Google Play</h3>
+  <p>Le app distribuite da Google Play sono firmate da Google con la chiave dell'app, che Google custodisce nei
+  propri sistemi (Play App Signing). Chi sviluppa l'app la carica sullo store con una chiave diversa, che serve solo
+  al caricamento. Android scrive nell'attestazione l'impronta del certificato dell'app installata e il server la
+  confronta con quella di Google Play: una copia ricompilata o installata da altre fonti ha un'altra firma, e qui
+  risulterebbe «Da verificare».</p>
+  <p>L'attestazione indica anche il numero di versione dell'app. Ogni versione pubblicata su Google Play ne ha uno
+  diverso, quindi si sa sempre con quale versione è stata fatta ogni timbratura.</p>
+  <h3>Chi ha emesso la chiave di attestazione</h3>
+  <p>Sui telefoni recenti la chiave che firma l'attestazione la emette Google stessa, con certificati che durano
+  poche settimane («emessa da Google»). Sui telefoni più vecchi è installata in fabbrica: per alcuni modelli chiavi
+  di fabbrica sono trapelate, e con quelle un telefono modificato potrebbe fingersi integro finché Google non le
+  revoca. Per questo la pagina dice quale dei due casi vale, e quelle di fabbrica valgono meno.</p>
+  <h3>Perché conta</h3>
+  <p>Fotocamera, posizione e reti Wi-Fi false richiedono un sistema modificato o un'app diversa: entrambi farebbero
+  fallire l'attestazione, e qui si vedrebbe. L'attestazione non garantisce invece l'ora del telefono, che si cambia
+  dalle impostazioni (la controlla l'app con gli orologi di rete e satellitare: scheda «L'ora della timbratura»), né
+  la scelta tra entrata e uscita, che è di chi timbra e la mostra il video del terminale.</p>
+  {{ close("attestazione") }}
+</div>
+
+<div popover id="info-posizione" role="dialog" aria-labelledby="info-posizione-t">
+  <h2 id="info-posizione-t">Posizione e reti Wi-Fi</h2>
+  <p>La posizione viene letta dal sistema Android al momento della timbratura ed entra nel manifest firmato.</p>
+  <h3>Posizioni simulate</h3>
+  <p>Le app che simulano la posizione funzionano senza modificare il telefono, ma Android stesso contrassegna quelle
+  posizioni come simulate, e l'app registra il contrassegno: qui compare «non simulata» oppure l'avviso. Per
+  nascondere una simulazione serve modificare il sistema (root), cosa che l'attestazione hardware rivela (con le
+  riserve sulle chiavi di fabbrica dette nella scheda dell'attestazione).</p>
+  <h3>Reti Wi-Fi</h3>
+  <p>Il manifest contiene anche gli identificativi (BSSID) degli access point Wi-Fi visibili in quel momento, mai i
+  nomi delle reti. Gli access point dell'edificio si ripetono giorno dopo giorno nelle altre timbrature e un
+  perito può ritrovarli sul posto: sono un riscontro indipendente dal GPS.</p>
+  <h3>Il valore della posizione</h3>
+  <p>Da sola la posizione è un dato rilevato dal telefono: il suo valore sta nell'insieme di firma, attestazione,
+  reti Wi-Fi e soprattutto del video, che mostra il terminale di rilevazione.</p>
+  {{ close("posizione") }}
+</div>
+
+<div popover id="info-catena" role="dialog" aria-labelledby="info-catena-t">
+  <h2 id="info-catena-t">Il registro a catena</h2>
+  <p>Ogni timbratura ricevuta dal server viene collegata alla precedente con un'impronta che comprende manifest,
+  firma, chiave del telefono e ora di ricezione. Togliere, alterare o riordinare un record spezzerebbe tutti i
+  collegamenti successivi.</p>
+  <p>Ogni notte l'ultimo anello del giorno riceve una marca temporale qualificata e una prova OpenTimestamps: da
+  quel momento nemmeno chi gestisce il server può togliere, aggiungere o riordinare le timbrature di quel giorno
+  senza che si veda. Prima della marca della notte potrebbe soltanto ometterne una (mai crearne o cambiarne una):
+  anche allora, riscrivere la catena lascerebbe marche dei record arrivate molto dopo la ricezione dichiarata, e la
+  verifica lo segnala. Una verifica completa dell'archivio gira ogni notte.</p>
+  <p>L'ora «ricevuta dal server» viene dall'orologio del server; le marche temporali, arrivate pochi secondi dopo, la
+  confermano in modo indipendente.</p>
+  {{ close("catena") }}
+</div>
+
+<div popover id="info-provenienza" role="dialog" aria-labelledby="info-provenienza-t">
+  <h2 id="info-provenienza-t">Provenienza dell'app e del server</h2>
+  <p>Firme, marche e attestazione dicono che i dati non sono cambiati. Questa scheda risponde a un'altra domanda:
+  il programma che li ha prodotti fa davvero quello che si dichiara? Per questo il codice dell'app e del server è
+  pubblico{% if v.sources %} (<a href="{{ v.sources }}" rel="noopener noreferrer" target="_blank">{{ v.sources.removeprefix("https://") }}</a>){% endif %},
+  versione per versione, e chiunque può leggerlo.</p>
+  <h3>Pubblicato prima di andare in funzione</h3>
+  <p>Ogni versione viene pubblicata su GitHub prima di essere installata sul server, in una <em>release</em> che
+  non si può più modificare: l'archivio dei sorgenti riceve le marche temporali qualificate di ACCV e Sectigo e la
+  prova sulla blockchain Bitcoin. Il codice di una versione esisteva quindi, così com'è, prima delle timbrature
+  che ha trattato, e non si può sostituire dopo.</p>
+  <h3>L'app è costruita da GitHub, non da chi la usa</h3>
+  <p>L'app non viene compilata sul computer di chi timbra: la costruisce un flusso automatico di GitHub, con i log
+  pubblici, partendo dai sorgenti pubblicati, e la carica su Google Play. GitHub rilascia un'<em>attestazione di
+  provenienza</em> firmata e registrata in un registro pubblico (Sigstore): «questo file l'ha prodotto questo
+  flusso, da questo commit». Google Play la firma poi con la propria chiave.</p>
+  <h3>Il collegamento con ogni timbratura</h3>
+  <p>L'attestazione hardware di ogni timbratura riporta quale app l'ha fatta, in quale versione e con la firma di
+  Google Play: la riga «Codice» porta alla release di quella versione, dove ci sono le impronte del codice dell'app.
+  Un perito può estrarre l'app dal telefono e confrontarle. La stessa riga indica la versione del server che ha
+  ricevuto la timbratura, con i suoi sorgenti.</p>
+  <h3>E il server?</h3>
+  <p>Il server non ha un'attestazione hardware come il telefono: la sua versione è registrata e il suo codice è
+  pubblico, ma soprattutto non serve fidarsi di lui. Tutto ciò che afferma si ricontrolla dal pacchetto di prova
+  contro Google, i prestatori qualificati e Bitcoin, e lo script di verifica del pacchetto è identico a quello
+  pubblicato per quella versione: lo controlla da sé.</p>
+  {{ close("provenienza") }}
+</div>
+
+<div popover id="info-verifica" role="dialog" aria-labelledby="info-verifica-t">
+  <h2 id="info-verifica-t">La verifica indipendente</h2>
+  <p>Non serve fidarsi di questo server. Il pacchetto di prova (zip) contiene il video, il manifest, la firma, la
+  chiave del telefono, gli anelli della catena del giorno, tutte le marche temporali con i certificati dei
+  prestatori, l'attestazione hardware, una copia della Trusted List e le istruzioni (<code>VERIFICA.md</code>).</p>
+  <p>Lo script <code>verifica.py</code> controlla tutto da solo, con il solo Python standard: impronte e catena,
+  firma del telefono, attestazione, firme e certificati di ogni marca con le risposte di non revoca, prove Bitcoin
+  con il lavoro di calcolo del blocco. Le radici di fiducia non le prende dal pacchetto ma dalle fonti ufficiali:
+  le radici pubblicate da Google, la Trusted List europea per i prestatori qualificati, i siti degli altri
+  prestatori, due archivi pubblici della blockchain. Il codice è leggibile, e gli stessi controlli si ripetono con
+  <code>openssl</code> e <code>ots</code>. Un consulente tecnico può rifare ogni passaggio su un computer
+  qualsiasi.</p>
+  {{ close("verifica") }}
+</div>
+
+<div popover id="info-probatorio" role="dialog" aria-labelledby="info-probatorio-t">
+  <h2 id="info-probatorio-t">Valore probatorio</h2>
+  <h3>Il video come riproduzione meccanica</h3>
+  <p>Le riproduzioni fotografiche e cinematografiche formano piena prova dei fatti rappresentati se colui contro il
+  quale sono prodotte non ne disconosce la conformità ai fatti (art. 2712 c.c.). Il disconoscimento deve essere
+  chiaro, circostanziato ed esplicito (Cass. 3122/2015; Cass. 24613/2019) e, anche dopo il disconoscimento, il giudice
+  può accertare la conformità con altri mezzi di prova, compresa la consulenza tecnica.</p>
+  <h3>Il documento informatico</h3>
+  <p>L'idoneità del documento informatico a soddisfare la forma scritta e il suo valore probatorio sono liberamente
+  valutabili in giudizio in relazione alle sue caratteristiche di sicurezza, integrità e immodificabilità (art. 20,
+  comma 1-bis, d.lgs. 82/2005, Codice dell'amministrazione digitale). Le schede tecniche di questa pagina descrivono
+  proprio queste caratteristiche.</p>
+  <h3>La marca temporale qualificata</h3>
+  <p>Una validazione temporale elettronica qualificata gode della presunzione di accuratezza della data e dell'ora
+  che indica e di integrità dei dati ai quali tale data e ora sono associate (art. 41, par. 2, Reg. UE 910/2014,
+  eIDAS), ed è riconosciuta come tale in tutti gli Stati membri (art. 41, par. 3).</p>
+  <h3>Gli altri elementi</h3>
+  <p>Alle marche non qualificate e alle firme elettroniche non qualificate non possono essere negati gli effetti
+  giuridici e l'ammissibilità come prova per il solo fatto di essere in forma elettronica o non qualificate (artt.
+  41, par. 1, e 25, par. 1, eIDAS). La memorizzazione su registri distribuiti (blockchain) è disciplinata dall'art.
+  8-ter del d.l. 135/2018 (L. 12/2019). Questi elementi sono valutati liberamente dal giudice e rafforzano le marche
+  qualificate.</p>
+  {{ close("probatorio") }}
+</div>
+
+<div popover id="info-liceita" role="dialog" aria-labelledby="info-liceita-t">
+  <h2 id="info-liceita-t">Liceità della raccolta</h2>
+  <h3>Finalità</h3>
+  <p>Le riprese servono esclusivamente a documentare le proprie timbrature per tutelare un diritto, anche prima e al
+  di fuori di un giudizio: è la base giuridica degli artt. 6, par. 1, lett. f), e 9, par. 2, lett. f), del
+  Regolamento (UE) 2016/679 (GDPR). La giurisprudenza riconosce la raccolta di prove a tutela dei propri diritti
+  come espressione del diritto di difesa (Cass. 27424/2014; Cass. 11322/2018).</p>
+  <h3>Proporzionalità</h3>
+  <p>Ogni ripresa dura al massimo 15 secondi, è senza audio e inquadra solo il display del terminale e il badge,
+  senza riprendere altre persone (minimizzazione, art. 5, par. 1, lett. c, GDPR). I dati restano nella disponibilità
+  dell'interessato e sono mostrati solo all'ente e a chi tutela i suoi diritti, tramite link a scadenza con accessi
+  registrati. I video si cancellano dopo il periodo di conservazione, salvo quelli contestati.</p>
+  <h3>Uso in giudizio</h3>
+  <p>La validità e l'utilizzabilità in un procedimento giudiziario di atti e documenti basati su trattamenti di dati
+  personali restano disciplinate dalle pertinenti disposizioni processuali (art. 160-bis, d.lgs. 196/2003).</p>
+  {{ close("liceita") }}
+</div>

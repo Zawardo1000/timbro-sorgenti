@@ -1,0 +1,384 @@
+{
+  "nota": "Esempi delle risposte dell'API per l'app. tests/test_contratto.py controlla che abbiano gli stessi campi (e tipi) delle risposte vere; i test di android/core li leggono con i modelli Kotlin.",
+  "register": {
+    "device_id": "5b0f6c1e-8d7a-4c39-9a51-2f7e4b1d0c33",
+    "api_token": "xYz0123456789abcdefghijklmnopqrstuvwxyzABCD"
+  },
+  "punch_status": {
+    "id": 124,
+    "client_id": "0f8fad5b-d9cb-469f-a165-70867728950e",
+    "kind": "out",
+    "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+    "server_received_at": "2026-11-05T11:31:02.481233+00:00",
+    "chain_hash": "60303ae22b998861bce3b28f33eec1be758a213c86c93c076dbe9f558c11c752",
+    "video_received": true,
+    "stamps": [
+      {
+        "target": "video",
+        "provider": "accv",
+        "qualified": true,
+        "status": "complete",
+        "gen_time": "2026-11-05T11:31:04+00:00"
+      },
+      {
+        "target": "video",
+        "provider": "ots",
+        "qualified": false,
+        "status": "upgrading",
+        "gen_time": null
+      }
+    ],
+    "location": {
+      "lat": 41.9,
+      "lon": 12.5,
+      "accuracy_m": 10.0,
+      "provider": "fused",
+      "is_mock": false,
+      "fix_time": "2026-11-05T12:30:58.000+01:00"
+    },
+    "attestation": {
+      "ok": true,
+      "problems": []
+    }
+  },
+  "history": {
+    "days": [
+      {
+        "date": "2026-11-05",
+        "punches": [
+          {
+            "id": 123,
+            "client_id": "1b4e28ba-2fa1-11d2-883f-0016d3cca427",
+            "kind": "in",
+            "time": "2026-11-05T07:58:12.431000+01:00",
+            "server_received_at": "2026-11-05T06:58:13.004512+00:00",
+            "video": "ricevuto",
+            "qualified_stamp": true,
+            "attestation_ok": true,
+            "contested": false,
+            "keep": false
+          },
+          {
+            "id": 124,
+            "client_id": "0f8fad5b-d9cb-469f-a165-70867728950e",
+            "kind": "out",
+            "time": "2026-11-05T12:31:02.481233+01:00",
+            "server_received_at": "2026-11-05T11:31:02.481233+00:00",
+            "video": "mancante",
+            "qualified_stamp": false,
+            "attestation_ok": null,
+            "contested": true,
+            "keep": true
+          }
+        ]
+      }
+    ],
+    "next_until": "2026-10-22"
+  },
+  "profile": {
+    "full_name": "Mario Rossi",
+    "employee_number": "012345",
+    "email": "mario.rossi@example.it",
+    "contest_recipients": [
+      "ufficio.personale@ente.example.it",
+      "responsabile@ente.example.it"
+    ],
+    "mail_configured": true
+  },
+  "contest": {
+    "day": "2026-11-04",
+    "punch": {
+      "id": 124,
+      "client_id": "0f8fad5b-d9cb-469f-a165-70867728950e",
+      "kind": "out",
+      "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+      "server_received_at": "2026-11-05T11:31:02.481233+00:00",
+      "chain_hash": "60303ae22b998861bce3b28f33eec1be758a213c86c93c076dbe9f558c11c752",
+      "video_received": true,
+      "stamps": [
+        {
+          "target": "video",
+          "provider": "accv",
+          "qualified": true,
+          "status": "complete",
+          "gen_time": "2026-11-05T11:31:04+00:00"
+        }
+      ],
+      "location": null,
+      "attestation": null,
+      "keep": true,
+      "contested": true,
+      "justification_ref": null,
+      "notes": null,
+      "device_time": "2026-11-05T12:31:02.481+01:00",
+      "video_available": true,
+      "video_deleted_at": null,
+      "video_deleted_reason": null
+    },
+    "share": {
+      "id": 31,
+      "label": "Contestazione del 04/11/2026",
+      "punch_ids": [
+        121,
+        122,
+        123,
+        124
+      ],
+      "allow_evidence_download": true,
+      "created_at": "2026-11-05T11:40:00.000000+00:00",
+      "expires_at": "2026-11-20T11:40:00.000000+00:00",
+      "revoked_at": null,
+      "active": true,
+      "accesses": 0,
+      "url": "https://timbro.example.it/s/AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcd"
+    },
+    "notice": {
+      "id": 7,
+      "status": "pending",
+      "recipients": [
+        "ufficio.personale@ente.example.it"
+      ],
+      "subject": "Timbrature del 04/11/2026: segnalazione di disallineamento - Mario Rossi, matricola 012345",
+      "created_at": "2026-11-05T11:40:00.000000+00:00",
+      "sent_at": null,
+      "error": null,
+      "share_id": 31,
+      "day": "2026-11-04",
+      "punch_id": 124
+    },
+    "hours": {
+      "worked_min": 514,
+      "due_min": 480,
+      "balance_min": 34,
+      "complete": true,
+      "open": false,
+      "adjustments": [
+        {
+          "code": "pausa_minima",
+          "params": {
+            "durata": 29,
+            "conteggiata": 30
+          }
+        }
+      ],
+      "anomalies": []
+    }
+  },
+  "schedule": {
+    "versions": [
+      {
+        "valid_from": "2026-01-01",
+        "days": {
+          "1": {
+            "due_min": 480,
+            "pause": true
+          },
+          "2": {
+            "due_min": 480,
+            "pause": true
+          },
+          "3": {
+            "due_min": 480,
+            "pause": true
+          },
+          "4": {
+            "due_min": 480,
+            "pause": true
+          },
+          "5": {
+            "due_min": 240,
+            "pause": false
+          }
+        },
+        "entry_from": "07:30:00",
+        "entry_to": "09:30:00",
+        "pause_from": "12:15:00",
+        "pause_to": "13:15:00",
+        "pause_counted_min": 30,
+        "pause_terminal_min": 15,
+        "no_pause_after_min": 360,
+        "no_pause_deduct_min": 30
+      },
+      {
+        "valid_from": "2027-01-04",
+        "days": {
+          "1": {
+            "due_min": 540,
+            "pause": true
+          },
+          "2": {
+            "due_min": 540,
+            "pause": true
+          },
+          "3": {
+            "due_min": 540,
+            "pause": true
+          },
+          "4": {
+            "due_min": 540,
+            "pause": true
+          }
+        },
+        "entry_from": "07:30:00",
+        "entry_to": "09:30:00",
+        "pause_from": "12:15:00",
+        "pause_to": "13:15:00",
+        "pause_counted_min": 30,
+        "pause_terminal_min": 15,
+        "no_pause_after_min": 360,
+        "no_pause_deduct_min": 30
+      }
+    ]
+  },
+  "me": {
+    "user_id": 2,
+    "username": "bianchi",
+    "role": "admin",
+    "device_id": "5b0f6c1e-8d7a-4c39-9a51-2f7e4b1d0c33",
+    "profile": {
+      "full_name": "Mario Rossi",
+      "employee_number": "012345",
+      "email": "mario.rossi@example.it",
+      "contest_recipients": [
+        "ufficio.personale@ente.example.it",
+        "responsabile@ente.example.it"
+      ]
+    },
+    "assignments": [
+      {
+        "schedule_id": 1,
+        "schedule_name": "36 h su 5 giorni",
+        "valid_from": "2026-01-01"
+      }
+    ],
+    "mail_configured": true
+  },
+  "system_users": [
+    {
+      "id": 2,
+      "username": "bianchi",
+      "role": "admin",
+      "profile": {
+        "full_name": "Mario Rossi",
+        "employee_number": "012345",
+        "email": null,
+        "contest_recipients": [
+          "ufficio.personale@ente.example.it",
+          "responsabile@ente.example.it"
+        ]
+      },
+      "assignments": [
+        {
+          "schedule_id": 1,
+          "schedule_name": "36 h su 5 giorni",
+          "valid_from": "2026-01-01"
+        }
+      ],
+      "devices": [
+        {
+          "id": "5b0f6c1e-8d7a-4c39-9a51-2f7e4b1d0c33",
+          "name": "Pixel",
+          "created_at": "2026-11-05T11:00:00.000000+00:00",
+          "revoked_at": null
+        }
+      ]
+    }
+  ],
+  "system_schedules": [
+    {
+      "id": 1,
+      "name": "36 h su 5 giorni",
+      "versions": [
+        {
+          "valid_from": "2026-01-01",
+          "days": {
+            "1": {
+              "due_min": 480,
+              "pause": true
+            },
+            "2": {
+              "due_min": 480,
+              "pause": true
+            },
+            "3": {
+              "due_min": 480,
+              "pause": true
+            },
+            "4": {
+              "due_min": 480,
+              "pause": true
+            },
+            "5": {
+              "due_min": 240,
+              "pause": false
+            }
+          },
+          "entry_from": "07:30:00",
+          "entry_to": "09:30:00",
+          "pause_from": "12:15:00",
+          "pause_to": "13:15:00",
+          "pause_counted_min": 30,
+          "pause_terminal_min": 15,
+          "no_pause_after_min": 360,
+          "no_pause_deduct_min": 30
+        },
+        {
+          "valid_from": "2027-01-04",
+          "days": {
+            "1": {
+              "due_min": 540,
+              "pause": true
+            },
+            "2": {
+              "due_min": 540,
+              "pause": true
+            },
+            "3": {
+              "due_min": 540,
+              "pause": true
+            },
+            "4": {
+              "due_min": 540,
+              "pause": true
+            }
+          },
+          "entry_from": "07:30:00",
+          "entry_to": "09:30:00",
+          "pause_from": "12:15:00",
+          "pause_to": "13:15:00",
+          "pause_counted_min": 30,
+          "pause_terminal_min": 15,
+          "no_pause_after_min": 360,
+          "no_pause_deduct_min": 30
+        }
+      ]
+    }
+  ],
+  "pairing_code": {
+    "code": "AbCdEfGhIjKl",
+    "valid_minutes": 15,
+    "username": "rossi"
+  },
+  "enroll": {
+    "device_id": "5b0f6c1e-8d7a-4c39-9a51-2f7e4b1d0c33",
+    "api_token": "xYz0123456789abcdefghijklmnopqrstuvwxyzABCD",
+    "client_cert_pem": "-----BEGIN CERTIFICATE-----\nMIIBxTCCAWugAwIBAgIUPRoVa0==\n-----END CERTIFICATE-----\n",
+    "client_chain_pem": "-----BEGIN CERTIFICATE-----\nMIIBxTCCAWugAwIBAgIUPRoVa0==\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\nMIIBxTCCAWugAwIBAgIUCaInt0==\n-----END CERTIFICATE-----\n"
+  },
+  "notices": [
+    {
+      "id": 7,
+      "status": "pending",
+      "recipients": [
+        "ufficio.personale@ente.example.it"
+      ],
+      "subject": "Timbrature del 04/11/2026: segnalazione di disallineamento - Mario Rossi, matricola 012345",
+      "created_at": "2026-11-05T11:40:00.000000+00:00",
+      "sent_at": null,
+      "error": null,
+      "share_id": 31,
+      "day": "2026-11-04",
+      "punch_id": 124
+    }
+  ]
+}

@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<title>Timbrature — {{ share.label }}</title>
+<style>
+@font-face { font-family: "Unbounded"; src: url("/s/static/fonts/unbounded.woff2") format("woff2"); font-weight: 200 900; font-display: swap; }
+@font-face { font-family: "Inter"; src: url("/s/static/fonts/inter.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "JetBrains Mono"; src: url("/s/static/fonts/jetbrains_mono.woff2") format("woff2"); font-weight: 100 800; font-display: swap; }
+:root {
+  --bg: #0D0D10; --card: #17171C; --rilievo: #24242C; --line: #2E2E38; --text: #FFFFFF; --muted: #A8A8B3;
+  --in: #3DFFB0; --out: #FF7A1A; --warn: #FFE14D; --keep: #8ED0FF; --bad: #FF6B6B;
+  --title: "Unbounded", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, monospace;
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body { margin: 0 auto; max-width: 1440px; padding: 20px 16px 48px; background: var(--bg); color: var(--text);
+       font: 16px/1.5 "Inter", system-ui, sans-serif; }
+a { color: var(--in); }
+h1, h2, h3 { font-family: var(--title); margin: 0; line-height: 1.15; }
+code, .mono { font-family: var(--mono); }
+code { font-size: 13px; word-break: break-all; color: #D6D6DE; }
+.muted { color: var(--muted); }
+header { margin: 0 0 22px; border-radius: 26px; overflow: hidden; background: var(--card); }
+header .band { height: 10px; background: linear-gradient(90deg, var(--in), var(--out)); }
+header .body { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap; padding: 22px 24px 24px; }
+header .word { font-family: var(--title); font-weight: 900; font-size: clamp(44px, 7vw, 76px); line-height: .95; letter-spacing: -0.03em; }
+header .word span { color: var(--out); }
+header .tag { margin-top: 10px; font-size: 16px; color: var(--muted); }
+header .who { text-align: right; }
+header .who .n { font-family: var(--title); font-size: 22px; font-weight: 700; }
+header .who .m { font-family: var(--mono); font-size: 15px; color: #D6D6DE; margin-top: 4px; }
+header .who .v { font-size: 13px; color: var(--muted); margin-top: 8px; }
+@media (max-width: 640px) { header .who { text-align: left; } }
+.card { background: var(--card); border-radius: 22px; padding: 18px; margin: 14px 0; }
+.banner { border: 2px solid var(--warn); }
+.banner h2 { font-size: 20px; color: var(--warn); margin-bottom: 8px; }
+.banner p { margin: 6px 0; }
+.day-head { display: flex; align-items: center; gap: 14px; }
+.day-num { font-family: var(--title); font-weight: 900; font-size: 40px; line-height: 1; }
+.day-head .t { font-weight: 800; font-size: 17px; }
+.bar { position: relative; height: 12px; border-radius: 6px; background: var(--rilievo); margin: 16px 0 6px; }
+.bar span { position: absolute; top: 0; bottom: 0; border-radius: 6px; background: linear-gradient(90deg, var(--in), var(--out)); }
+.ticks { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-family: var(--mono); }
+.chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 12px; border-radius: 11px;
+        font-family: var(--mono); font-weight: 700; font-size: 16px; color: var(--bg); text-decoration: none; }
+.chip.in { background: var(--in); } .chip.out { background: var(--out); }
+.chip.contested { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--warn); }
+.pause { font-size: 12px; font-weight: 700; color: var(--muted); }
+.hours { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.hours > div { display: flex; flex-direction: column; }
+.hours span { font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.hours b { font-size: 20px; }
+.hours .i { margin-left: auto; }
+.punch h3 { font-size: 20px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.dot { width: 14px; height: 14px; border-radius: 7px; display: inline-block; }
+.dot.in { background: var(--in); } .dot.out { background: var(--out); }
+.badge { font-family: "Inter", sans-serif; font-size: 12px; font-weight: 800; border-radius: 6px; padding: 2px 8px; color: var(--bg); }
+.badge.warn { background: var(--warn); } .badge.q { background: var(--in); } .badge.nq { background: var(--rilievo); color: var(--muted); }
+video { width: 100%; border-radius: 14px; background: #000; margin: 14px 0 4px; display: block; }
+.nov { margin: 14px 0; padding: 14px; border-radius: 14px; background: var(--rilievo); color: var(--muted); }
+dl { margin: 10px 0 0; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; padding: 12px 0; border-top: 1px solid var(--line); }
+.row dt { font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.row dd { margin: 0; grid-column: 1; }
+.row .i { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+.ok { color: var(--in); font-weight: 700; } .ko { color: var(--warn); font-weight: 700; }
+ul.stamps { list-style: none; padding: 0; margin: 4px 0 0; display: flex; flex-direction: column; gap: 8px; }
+ul.stamps li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+ul.stamps li.group:not(:first-child) { margin-top: 6px; padding-top: 14px; border-top: 1px solid var(--line); }
+ul.stamps .when { font-family: var(--mono); font-weight: 700; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 18px;
+       border-radius: 16px; border: 0; background: var(--text); color: var(--bg); font: 800 15px "Inter", sans-serif;
+       text-decoration: none; cursor: pointer; }
+.btn.sec { background: var(--rilievo); color: var(--text); }
+.i { width: 36px; height: 36px; border-radius: 18px; border: 0; background: var(--rilievo); color: var(--text);
+     font: 800 16px/36px var(--title); cursor: pointer; padding: 0; }
+.i:hover, .i:focus-visible { background: var(--text); color: var(--bg); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; margin-top: 12px; }
+section > h2 { font-size: 22px; margin: 32px 0 4px; }
+[popover] { width: min(680px, calc(100vw - 24px)); max-height: 88vh; overflow: auto; margin: auto; padding: 22px;
+            border: 1px solid var(--line); border-radius: 22px; background: var(--card); color: var(--text); }
+[popover]::backdrop { background: rgba(0, 0, 0, .72); }
+[popover] h2 { font-size: 22px; margin-bottom: 12px; }
+[popover] h3 { font-size: 15px; margin: 18px 0 6px; color: var(--in); }
+[popover] p, [popover] li { color: #E4E4EA; }
+[popover] .close { margin-top: 18px; }
+.punch-body dl { margin-top: 10px; }
+.stamps-row { margin-top: 6px; }
+@media (min-width: 1320px) {
+  ul.stamps li { display: grid; grid-template-columns: minmax(190px, 1.3fr) 160px minmax(210px, 1.3fr) 200px minmax(330px, 2fr); gap: 14px; }
+  ul.stamps li > * { align-self: center; }
+  ul.stamps li .badge { justify-self: start; }
+}
+video { max-height: 70vh; object-fit: contain; }
+@media (min-width: 900px) {
+  body { padding: 28px 28px 56px; }
+  .punch-body { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 28px; align-items: start; }
+  .punch-body .media { position: sticky; top: 16px; }
+  .punch-body dl { margin-top: 4px; }
+  .punch-body .row:first-child { border-top: 0; }
+}
+@media print { [popover] { display: none; } .i, .btn { display: none; } }
+</style>
+</head>
+<body>
+{% macro info(id, label) %}<button class="i" type="button" popovertarget="info-{{ id }}" aria-label="{{ label }}">i</button>{% endmacro %}
+{% macro hm(dt) %}{{ dt.strftime("%H:%M") }}{% endmacro %}
+
+<header><div class="band"></div><div class="body">
+  <div><div class="word">timbro<span>.</span></div>
+  <div class="tag">Registro probatorio · video, firme e marche temporali qualificate</div></div>
+  <div class="who">
+    {% if v.owner.full_name %}<div class="n">{{ v.owner.full_name }}</div>{% endif %}
+    {% if v.owner.employee_number %}<div class="m">matricola {{ v.owner.employee_number }}</div>{% endif %}
+    <div class="v">{{ share.label }} · link valido fino al {{ v.expires.strftime("%d/%m/%Y %H:%M") }} · ogni accesso viene registrato</div>
+  </div>
+</div></header>
+
+{% if v.contest %}
+<div class="card banner">
+  <h2>Segnalazione di disallineamento</h2>
+  {% if v.contest.day %}<p>Giornata segnalata: <b>{{ v.contest.day }}</b>. Si segnala che i dati di presenza registrati dall'ente non corrispondono a quanto documentato qui{% if v.days and v.days[0].hours %}, comprese le ore valide calcolate secondo l'articolazione oraria{% endif %}.</p>{% endif %}
+  {% for p in v.contest.punches %}
+  <p>Timbratura contestata: <b>{{ "l'entrata" if p.kind == "in" else "l'uscita" }} delle {{ hm(p.time) }}</b> di {{ p.time.strftime("%d/%m/%Y") }}.</p>
+  {% endfor %}
+  {% if v.contest.note %}<p><b>Nota:</b> {{ v.contest.note }}</p>{% endif %}
+  <p class="muted">Qui sotto c'è ogni timbratura della giornata con il video originale, la firma del telefono e le marche temporali. I pulsanti <b>i</b> spiegano perché questi dati sono affidabili e che valore hanno.</p>
+</div>
+{% endif %}
+
+{% for d in v.days %}
+<div class="card">
+  <div class="day-head">
+    <span class="day-num">{{ "%02d"|format(d.date.day) }}</span>
+    <div><div class="t">{{ d.label[:1]|upper }}{{ d.label[1:] }}</div><div class="muted">{{ d.punches|length }} {{ "timbratura" if d.punches|length == 1 else "timbrature" }}</div></div>
+  </div>
+  <div class="bar" aria-hidden="true">{% for s in d.bar %}<span style="left: {{ s.left }}%; width: {{ s.width }}%"></span>{% endfor %}</div>
+  <div class="ticks" aria-hidden="true"><span>7</span><span>10</span><span>13</span><span>16</span><span>19</span></div>
+  <div class="chips">
+    {% for p in d.punches %}
+    <a class="chip {{ p.kind }}{% if p.contested %} contested{% endif %}" href="#p{{ p.id }}" aria-label="{{ p.label }} delle {{ hm(p.time) }}{% if p.contested %}, contestata{% endif %}">{{ "→" if p.kind == "in" else "←" }} {{ hm(p.time) }}</a>
+    {% if d.pauses.get(p.id) is not none %}<span class="pause">pausa {{ d.pauses[p.id] }}′</span>{% endif %}
+    {% endfor %}
+  </div>
+  {% if d.hours %}
+  <div class="hours">
+    <div><span class="muted">Ore valide</span><b class="mono">{{ d.hours.worked }}</b></div>
+    <div><span class="muted">Dovute</span><b class="mono">{{ d.hours.due }}</b></div>
+    {% if d.hours.balance %}<div><span class="muted">Saldo</span><b class="mono {{ 'ko' if d.hours.negative else 'ok' }}">{{ d.hours.balance }}</b></div>{% endif %}
+    <button class="i" type="button" popovertarget="info-ore-{{ d.date.isoformat() }}" aria-label="Come sono calcolate le ore">i</button>
+  </div>
+  <div popover id="info-ore-{{ d.date.isoformat() }}" role="dialog" aria-labelledby="info-ore-{{ d.date.isoformat() }}-t">
+    <h2 id="info-ore-{{ d.date.isoformat() }}-t">Ore di {{ d.label }}</h2>
+    <p>Ore valide <b>{{ d.hours.worked }}</b>, dovute <b>{{ d.hours.due }}</b>{% if d.hours.balance %}, saldo <b>{{ d.hours.balance }}</b>{% endif %}.
+    Il calcolo applica alle timbrature qui sopra l'articolazione oraria dell'interessato.</p>
+    <h3>Correzioni applicate</h3>
+    {% if d.hours.adjustments %}<ul>{% for a in d.hours.adjustments %}<li>{{ a }}</li>{% endfor %}</ul>
+    {% else %}<p>Nessuna: le ore valide coincidono con il tempo tra le timbrature.</p>{% endif %}
+    {% if d.hours.anomalies %}<h3>Da verificare</h3><ul>{% for a in d.hours.anomalies %}<li>{{ a }}</li>{% endfor %}</ul>{% endif %}
+    <h3>Articolazione oraria in vigore</h3>
+    <ul>{% for line in d.hours.schedule %}<li>{{ line }}</li>{% endfor %}</ul>
+    <p class="muted">Ore e minuti come sul terminale: i secondi non contano.</p>
+    <button class="btn close" type="button" popovertarget="info-ore-{{ d.date.isoformat() }}" popovertargetaction="hide">Chiudi</button>
+  </div>
+  {% endif %}
+  {% if d.chain_stamps %}
+  <p class="muted" style="margin: 14px 0 0">Catena del giorno marcata da: {% for s in d.chain_stamps %}{{ s.provider.split(" · ")[0] }}{% if s.qualified %} (qualificata){% endif %}{% if not loop.last %}, {% endif %}{% endfor %} {{ info("catena", "Cos'è il registro a catena") }}</p>
+  {% endif %}
+</div>
+
+{% for p in d.punches %}
+<article class="card punch" id="p{{ p.id }}">
+  <h3><span class="dot {{ p.kind }}"></span>{{ p.label }} delle {{ p.time.strftime("%H:%M:%S") }}{% if p.contested %} <span class="badge warn">CONTESTATA</span>{% endif %}</h3>
+  <div class="punch-body">
+  <div class="media">
+  {% if p.video_url %}
+  <video controls controlslist="nodownload" preload="none" src="{{ p.video_url }}"></video>
+  <div class="muted" style="font-size: 13px">Video originale, {{ p.duration_s }} s, {{ p.size_mb }} MB, senza audio: il display del terminale e il badge.</div>
+  {% else %}
+  <div class="nov">Video non più conservato{% if p.video_deleted %} (cancellato alla scadenza della conservazione){% endif %}: restano la sua impronta, la firma e le marche temporali, che ne provano l'esistenza e il contenuto.</div>
+  {% endif %}
+  {% if p.evidence_url %}
+  <p style="display: flex; align-items: center; gap: 10px; margin: 16px 0 0"><a class="btn" href="{{ p.evidence_url }}">Scarica il pacchetto di prova</a>{{ info("verifica", "Come verificare da soli") }}</p>
+  {% endif %}
+  </div>
+  <dl>
+    <div class="row"><dt>Impronta del video (SHA-256)</dt><dd><code>{{ p.sha256 }}</code></dd>{{ info("video", "Perché il video non è alterato") }}</div>
+    <div class="row"><dt>Ora</dt><dd><span class="mono">{{ p.time.strftime("%H:%M:%S") }}</span>
+      {% if p.time_warning %}<span class="ko">· {{ p.time_warning }}</span>{% elif p.time_confirmed %}<span class="ok">✓ confermata {{ p.time_confirmed }}</span>{% else %}<span class="muted">· ora del telefono non confermata: vale la ricezione</span>{% endif %}
+      <br><span class="muted">del telefono {% if p.device_clock %}<span class="mono">{{ p.device_clock.strftime("%H:%M:%S") }}</span>{% else %}illeggibile{% endif %} · ricevuta dal server <span class="mono">{{ p.received.strftime("%H:%M:%S") }}</span>{% if p.delay_s is not none %}{% if p.delay_s > 120 %} ({{ (p.delay_s / 60)|round|int }} min dopo: inviata dalla coda del telefono){% elif p.delay_s >= 0 %} ({{ p.delay_s }} s dopo){% endif %}{% endif %}</span></dd>{{ info("ora", "Come si stabilisce l'ora") }}</div>
+    <div class="row"><dt>Firma del telefono</dt><dd><span class="ok">✓ verificata alla ricezione</span> · chiave <code>{{ p.device.fp[:16] }}…</code></dd>{{ info("firma", "Come è emessa la firma") }}</div>
+    <div class="row"><dt>Attestazione hardware</dt><dd>
+      {% if p.attestation is none %}<span class="muted">non presente per questa timbratura</span>
+      {% elif p.attestation.ok %}<span class="ok">✓ telefono integro</span> · chiave in {{ p.attestation.level }}, bootloader bloccato, avvio verificato{% if p.attestation.provisioning == "remota" %}, chiave di attestazione emessa da Google{% endif %}
+        {% if p.attestation.provisioning == "fabbrica" %}<br><span class="ko">Chiave di attestazione installata in fabbrica: vale meno di una emessa da Google</span>{% endif %}
+        <br><span class="ok">✓ app originale</span> {{ p.attestation.apps }}, firmata da Google Play
+      {% else %}<span class="ko">Da verificare:</span> {{ p.attestation.problems|join("; ") }}{% endif %}
+    </dd>{{ info("attestazione", "Cos'è l'attestazione hardware") }}</div>
+    <div class="row"><dt>Posizione</dt><dd>
+      {% if p.location %}<span class="mono">{{ p.location.lat }}, {{ p.location.lon }}</span>{% if p.location.accuracy %} ±{{ p.location.accuracy|round|int }} m{% endif %} ·
+        {% if p.location.mock %}<span class="ko">segnalata come simulata da Android</span>{% elif p.location.mock is sameas false %}<span class="ok">non simulata</span>{% else %}<span class="muted">simulazione non indicata</span>{% endif %}
+        · <a href="{{ p.location.osm }}" rel="noopener noreferrer" target="_blank">apri la mappa</a>
+      {% else %}<span class="muted">non disponibile</span>{% endif %}
+      {% if p.wifi %}<br>Reti Wi-Fi: {{ p.wifi.reti }} access point visibili, {{ p.wifi.gia_viste_in_altre_timbrature }} già visti in altre timbrature{% endif %}
+    </dd>{{ info("posizione", "Perché la posizione è affidabile") }}</div>
+    <div class="row"><dt>Registro a catena</dt><dd><code>{{ p.chain_hash }}</code></dd>{{ info("catena", "Cos'è il registro a catena") }}</div>
+    <div class="row"><dt>Codice</dt><dd>
+      app <span class="mono">{{ p.code.app }}</span>{% if p.code.app_release %} · <a href="{{ p.code.app_release }}" rel="noopener noreferrer" target="_blank">sorgenti e costruzione pubblici ({{ p.code.app_commit }})</a>{% elif p.code.app_local %} · <span class="muted">compilata in prova, senza release pubblica</span>{% endif %}
+      <br>server {% if p.code.server %}<span class="mono">{{ p.code.server }}</span>{% if p.code.server_release %} · <a href="{{ p.code.server_release }}" rel="noopener noreferrer" target="_blank">sorgenti pubblici</a>{% endif %}{% else %}<span class="muted">versione non registrata</span>{% endif %}
+    </dd>{{ info("provenienza", "Da dove viene il codice") }}</div>
+  </dl>
+  </div>
+  <div class="row stamps-row"><dt>Marche temporali</dt><dd>
+      <ul class="stamps">
+      {% for s in p.stamps %}
+        <li{% if loop.first or s.provider_id != loop.previtem.provider_id %} class="group"{% endif %}><span>{{ s.provider }}</span>
+          {% if s.qualified %}<span class="badge q">QUALIFICATA eIDAS</span>{% elif s.ots %}<span class="badge nq">BLOCKCHAIN</span>{% else %}<span class="badge nq">NON QUALIFICATA</span>{% endif %}
+          <span class="muted">{{ s.target }}</span>
+          <span class="when">{% if s.time %}{{ s.time.strftime("%d/%m/%Y %H:%M:%S") }}{% endif %}</span>
+          <span class="{{ 'ok' if s.complete else 'muted' }}">{{ s.state }}</span></li>
+      {% else %}
+        <li class="muted">marche in corso</li>
+      {% endfor %}
+      </ul>
+    </dd>{{ info("marca", "Cos'è la marca temporale qualificata") }}</div>
+</article>
+{% endfor %}
+{% endfor %}
+
+<section>
+  <h2>Perché questi dati sono affidabili</h2>
+  <div class="grid">
+    <button class="btn sec" type="button" popovertarget="info-inalterabili">Perché non si possono alterare</button>
+    <button class="btn sec" type="button" popovertarget="info-video">Il video</button>
+    <button class="btn sec" type="button" popovertarget="info-ora">L'ora della timbratura</button>
+    <button class="btn sec" type="button" popovertarget="info-marca">Le marche temporali</button>
+    <button class="btn sec" type="button" popovertarget="info-ots">OpenTimestamps</button>
+    <button class="btn sec" type="button" popovertarget="info-firma">La firma del telefono</button>
+    <button class="btn sec" type="button" popovertarget="info-attestazione">L'attestazione hardware</button>
+    <button class="btn sec" type="button" popovertarget="info-posizione">Posizione e reti Wi-Fi</button>
+    <button class="btn sec" type="button" popovertarget="info-catena">Il registro a catena</button>
+    <button class="btn sec" type="button" popovertarget="info-verifica">La verifica indipendente</button>
+    <button class="btn sec" type="button" popovertarget="info-provenienza">Provenienza dell'app e del server</button>
+  </div>
+  <h2>Valore legale</h2>
+  <div class="grid">
+    <button class="btn sec" type="button" popovertarget="info-probatorio">Valore probatorio</button>
+    <button class="btn sec" type="button" popovertarget="info-liceita">Liceità della raccolta</button>
+  </div>
+</section>
+
+
+{% include "share_info.html" %}
+</body>
+</html>

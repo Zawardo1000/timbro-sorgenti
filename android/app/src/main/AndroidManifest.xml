@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+        Sveglia per il rientro dalla pausa (sveglia/SvegliaRientro.kt): sveglia esatta con setAlarmClock e notifica
+        sul canale delle sveglie. USE_EXACT_ALARM vale da Android 13 ed è concesso all'installazione (l'app è una
+        sveglia per questo uso); su Android 12 serve SCHEDULE_EXACT_ALARM. POST_NOTIFICATIONS si chiede quando si
+        accende la sveglia.
+    -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- API del backend (ClientApi) e coda delle timbrature (InvioWorker, solo con la rete) -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!--
+        Registrazione della timbratura (acquisizione/): fotocamera, SENZA microfono (niente RECORD_AUDIO: il video è
+        muto per scelta, docs/PROGETTO.md §3.1); posizione e reti Wi-Fi visibili nel manifest firmato (§19). Le reti
+        si leggono solo con la posizione precisa concessa; startScan chiede CHANGE_WIFI_STATE.
+    -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="true" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <uses-feature android:name="android.hardware.wifi" android:required="false" />
+
+    <!--
+        Niente backup né trasferimento a un telefono nuovo: token, identità del telefono, coda e video senza le chiavi
+        del Keystore (che non si copiano) darebbero un telefono che firma male. Con targetSdk 31+ allowBackup="false"
+        spegne solo il backup su cloud: il trasferimento lo escludono le dataExtractionRules (Android 12+) e
+        fullBackupContent (Android 10-11).
+    -->
+    <application
+        android:name=".TimbroApp"
+        android:networkSecurityConfig="@xml/rete"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/regole_estrazione_dati"
+        android:fullBackupContent="@xml/regole_backup"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="false"
+        android:theme="@style/Theme.Timbro">
+        <!-- solo verticale: la registrazione non deve ripartire ruotando il telefono -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <receiver
+            android:name=".sveglia.SvegliaReceiver"
+            android:exported="false" />
+        <!-- pacchetto di prova scaricato nella cache e passato al selettore di Android (Dettaglio) -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.file"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/percorsi_file" />
+        </provider>
+    </application>
+</manifest>

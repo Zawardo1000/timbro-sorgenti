@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Solo la finestra: colori e caratteri li dà il tema Compose (ui/theme), sempre scuro. Le barre le gestiscono
+         enableEdgeToEdge in MainActivity e App (icone scure solo sopra il blocco colorato di Timbra). Force Dark
+         spento: l'interfaccia ha colori suoi e il sistema non deve toccarli. -->
+    <style name="Theme.Timbro" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/fondo</item>
+        <item name="android:statusBarColor">@color/fondo</item>
+        <item name="android:navigationBarColor">@color/fondo</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:forceDarkAllowed">false</item>
+    </style>
+</resources>

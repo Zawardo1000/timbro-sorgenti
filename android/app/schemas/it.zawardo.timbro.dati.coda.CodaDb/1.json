@@ -1,0 +1,127 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "eee1b363bed83135fb7a0bdfa55154cb",
+    "entities": [
+      {
+        "tableName": "coda",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `client_id` TEXT NOT NULL, `kind` TEXT NOT NULL, `manifest` BLOB NOT NULL, `firma` BLOB NOT NULL, `attestazione` TEXT, `video` TEXT NOT NULL, `video_sha256` TEXT NOT NULL, `creata_il` INTEGER NOT NULL, `stato` TEXT NOT NULL, `server_id` INTEGER, `tentativi` INTEGER NOT NULL, `prossimo_tentativo` INTEGER NOT NULL, `ultimo_errore` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "clientId",
+            "columnName": "client_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "manifest",
+            "columnName": "manifest",
+            "affinity": "BLOB",
+            "notNull": true
+          },
+          {
+            "fieldPath": "firma",
+            "columnName": "firma",
+            "affinity": "BLOB",
+            "notNull": true
+          },
+          {
+            "fieldPath": "attestazione",
+            "columnName": "attestazione",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "percorsoVideo",
+            "columnName": "video",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "videoSha256",
+            "columnName": "video_sha256",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "creataIl",
+            "columnName": "creata_il",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "stato",
+            "columnName": "stato",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "serverId",
+            "columnName": "server_id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "tentativi",
+            "columnName": "tentativi",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "prossimoTentativo",
+            "columnName": "prossimo_tentativo",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ultimoErrore",
+            "columnName": "ultimo_errore",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_coda_client_id",
+            "unique": true,
+            "columnNames": [
+              "client_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_coda_client_id` ON `${TABLE_NAME}` (`client_id`)"
+          },
+          {
+            "name": "index_coda_stato_prossimo_tentativo",
+            "unique": false,
+            "columnNames": [
+              "stato",
+              "prossimo_tentativo"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_coda_stato_prossimo_tentativo` ON `${TABLE_NAME}` (`stato`, `prossimo_tentativo`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'eee1b363bed83135fb7a0bdfa55154cb')"
+    ]
+  }
+}

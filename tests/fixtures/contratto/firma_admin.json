@@ -1,0 +1,47 @@
+{
+  "nota": "Esempi di firma admin (timbro/api/admin_auth.py). Chiave SOLO DI PROVA. Il corpo è testo UTF-8. Li controllano tests/test_contratto.py e i test di android/core. Rigenerarli cambia le firme: va bene, purché canonical resti uguale.",
+  "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEkWbHHbBRfrEdnuX1yjnj0aFOJcTi\nJkFHX4BzrTQTTQc/odrwSfcB+eAkCqAbUOa5zVvXv5P8lOw1e1YF5xfL+w==\n-----END PUBLIC KEY-----\n",
+  "private_key_pkcs8_pem": "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgEoZsg3dDzaM33Qbr\nuhpyGLFS6fevk1EfUBeIER+/1OmhRANCAASRZscdsFF+sR2e5fXKOePRoU4lxOIm\nQUdfgHOtNBNNBz+h2vBJ9wH54CQKoBtQ5rnNW9e/k/yU7DV7VgXnF8v7\n-----END PRIVATE KEY-----\n",
+  "vectors": [
+    {
+      "method": "PATCH",
+      "path": "/api/v1/admin/punches/12",
+      "query": "",
+      "time": "2026-11-05T12:00:00.000Z",
+      "nonce": "AbCdEfGhIjKlMnOpQrStUvWx",
+      "body": "{\"keep\":true,\"contested\":false}",
+      "canonical": "TIMBRO-ADMIN-1\nPATCH\n/api/v1/admin/punches/12\n2026-11-05T12:00:00.000Z\nAbCdEfGhIjKlMnOpQrStUvWx\na21c67fa08bc004832dc666bea79f81a5f026df81de76312e8ba316b48b3068b",
+      "signature": "MEQCIElx2/c83WJFpqZ67FiUzfTzLBjJI753EOttelxh+pwaAiBfaCxZNsubfDw9QB3AvIh28AEyM8CPbQzKO+goj5YTGQ=="
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/punches",
+      "query": "since=2026-11-01T00%3A00%3A00%2B01%3A00&limit=50",
+      "time": "2026-11-05T13:00:00.000+01:00",
+      "nonce": "nonce_di_prova-0123456789",
+      "body": "",
+      "canonical": "TIMBRO-ADMIN-1\nGET\n/api/v1/admin/punches?since=2026-11-01T00%3A00%3A00%2B01%3A00&limit=50\n2026-11-05T13:00:00.000+01:00\nnonce_di_prova-0123456789\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "signature": "MEQCIEdabxx4QxGe5F8cGdbfJeDULVHiFgaIBjwQ7jnKAhzGAiA2WrvwvrfHRuohmqmQiYi5zTNh4dURaVJSF7/KCz+blg=="
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/shares",
+      "query": "",
+      "time": "2026-11-05T12:00:05.250Z",
+      "nonce": "ZZZZ-____-0000-zzzz",
+      "body": "{\"punch_ids\":[1,2],\"label\":\"Per l'avvocato: è così\",\"days\":15}",
+      "canonical": "TIMBRO-ADMIN-1\nPOST\n/api/v1/admin/shares\n2026-11-05T12:00:05.250Z\nZZZZ-____-0000-zzzz\nf7149fc9f78eb185db694a303dc161e5c00ae783e4c443421189affdf1519604",
+      "signature": "MEQCIHNvTY1AafS3EHGUbdNHmWI1KNGLyjHXmyEqWPQfC/2WAiA9IKLVd5IOPPd+45eXnGD1rRZRIGUuTxk2cS8k2pbw9g=="
+    },
+    {
+      "method": "delete",
+      "path": "/api/v1/admin/punches/7/video",
+      "query": "",
+      "time": "2026-11-05T12:00:00.000Z",
+      "nonce": "0123456789abcdef",
+      "body": "",
+      "canonical": "TIMBRO-ADMIN-1\nDELETE\n/api/v1/admin/punches/7/video\n2026-11-05T12:00:00.000Z\n0123456789abcdef\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "signature": "MEQCIEBYahNyG4ra/F8mvy5gCozN/nMzh9eJHkO2MGYJwF6bAiBQ9s0XMVBiR13oZykElhxNqbHEEcqHMi4Bk6yvvu1zLQ=="
+    }
+  ]
+}

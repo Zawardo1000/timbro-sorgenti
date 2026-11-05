@@ -1,0 +1,55 @@
+Timbro - Licenza di sola consultazione
+
+Copyright (c) 2026 Zawardo (https://github.com/Zawardo1000). Tutti i diritti riservati.
+
+Il codice sorgente di questo repository è pubblicato al solo scopo di permettere a chiunque di leggerlo e
+capirlo, e di verificare l'affidabilità delle prove che Timbro produce. Non è software libero né open source:
+pubblicarlo non concede nessuna licenza d'uso oltre a quanto scritto qui.
+
+È consentito, senza bisogno di chiedere:
+1. leggere e studiare il codice, sul sito che lo ospita o in una copia scaricata per farlo;
+2. compilarlo ed eseguirlo al solo scopo di verificare che faccia quanto dichiarato, per esempio per confrontare
+   l'app costruita dai sorgenti con quella installata, o una release con i suoi sorgenti;
+3. eseguire timbro/verifica_pacchetto.py (verifica.py nei pacchetti di prova) per verificare pacchetti di prova
+   prodotti da Timbro;
+4. citare brevi estratti in perizie, consulenze, atti, pareri o relazioni che valutano le prove prodotte da Timbro.
+
+Senza autorizzazione scritta del titolare non è consentito, in tutto o in parte, neanche per frammenti:
+- riutilizzare il codice in altri programmi o progetti, commerciali o no;
+- modificarlo per usarlo, distribuirlo, ripubblicarlo o metterlo a disposizione di altri, salvo quanto le
+  condizioni del sito che lo ospita permettono di fare sul sito stesso (per esempio visualizzarlo o farne un fork);
+- usarlo per offrire a terzi un servizio, anche gratuito;
+- usarlo per addestrare modelli di intelligenza artificiale.
+
+File di terzi: i caratteri in timbro/static/fonts/ e android/app/src/main/res/font/ (SIL Open Font License, testo
+accanto ai file), i certificati pubblici di Google e dei prestatori di marche temporali, la Trusted List europea e
+i dati di prova presi da progetti di terzi (indicati nelle cartelle di tests/fixtures/) restano soggetti alle
+rispettive licenze e non sono coperti da questa.
+
+Il codice è fornito «così com'è», senza garanzie di alcun tipo; il titolare non risponde di danni derivanti dal
+suo uso.
+
+-----------------------------------------------------------------------------------------------------------------
+
+Timbro - View-only licence (English translation; the Italian text above prevails)
+
+Copyright (c) 2026 Zawardo (https://github.com/Zawardo1000). All rights reserved.
+
+This source code is published only so that anyone can read and understand it and verify the reliability of the
+evidence Timbro produces. It is neither free nor open source software.
+
+You may, without asking: (1) read and study the code; (2) build and run it solely to verify that it does what is
+stated, e.g. to compare the app built from these sources with an installed one, or a release with its sources;
+(3) run timbro/verifica_pacchetto.py (verifica.py in evidence packages) to verify evidence packages produced by
+Timbro; (4) quote short excerpts in expert reports, legal documents or opinions assessing Timbro evidence.
+
+Without the owner's written permission you may not, in whole or in part, not even fragments: reuse the code in
+other programs or projects, commercial or not; modify it in order to use, distribute, republish or make it
+available to others (except what the hosting site's terms allow on the site itself, e.g. viewing or forking);
+use it to provide a service to third parties, even free of charge; use it to train artificial intelligence models.
+
+Third-party files (fonts under the SIL Open Font License, public certificates of Google and of the time-stamping
+providers, the EU Trusted List, test data taken from third-party projects) remain under their own licences.
+
+The code is provided "as is", without warranty of any kind; the owner is not liable for any damages arising from
+its use.

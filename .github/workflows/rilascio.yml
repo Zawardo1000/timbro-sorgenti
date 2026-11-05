@@ -1,0 +1,194 @@
+# Rilascio di Timbro. A ogni tag timbro-<commit>, che il repository di sviluppo pubblica qui quando la sua CI è
+# verde, questo flusso (pubblico, con i log pubblici) crea la release:
+# - archivio dei sorgenti di quella versione, con le marche temporali qualificate eIDAS di ACCV e Sectigo e la prova
+#   OpenTimestamps sulla blockchain Bitcoin;
+# - se l'app è cambiata: app costruita qui dai sorgenti del tag, firmata con la chiave di caricamento, caricata nel
+#   test interno di Google Play; nella release solo le sue impronte (il bundle contiene gli indirizzi del server);
+# - attestazione di provenienza di GitHub (Sigstore) per archivio e app: "costruiti da questo flusso, da questo commit".
+# Le release sono immutabili. I segreti (chiave di caricamento, indirizzi del server, account di servizio di Google
+# Play) stanno nell'ambiente "rilascio", usabile solo dai tag timbro-*.
+name: Rilascio
+
+on:
+  push:
+    tags: ["timbro-*"]
+
+permissions: {}
+
+concurrency:
+  group: rilascio
+  cancel-in-progress: false
+
+jobs:
+  rilascio:
+    name: Release ${{ github.ref_name }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: rilascio
+    permissions:
+      contents: write      # la release
+      id-token: write      # attestazione (Sigstore)
+      attestations: write
+    env:
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Versione e cosa è cambiato
+        id: v
+        run: |
+          set -euo pipefail
+          commit=$(sed -n 's/^commit=//p' VERSIONE)
+          numero=$(sed -n 's/^numero=//p' VERSIONE)
+          data=$(sed -n 's/^data=//p' VERSIONE)
+          short=${commit:0:7}
+          [ "timbro-$short" = "$TAG" ] || { echo "::error::il tag $TAG non corrisponde al commit di VERSIONE"; exit 1; }
+          # l'app si ricostruisce (e va su Google Play) solo se android/ è cambiata dalla release precedente
+          prev=$(git describe --tags --abbrev=0 --match 'timbro-*' "$TAG^" 2>/dev/null || true)
+          app=1
+          if [ -n "$prev" ] && git diff --quiet "$prev" "$TAG" -- android/; then app=0; fi
+          { echo "commit=$commit"; echo "numero=$numero"; echo "data=$data"; echo "short=$short"
+            echo "app=$app"; echo "prev=$prev"; } >> "$GITHUB_OUTPUT"
+          mkdir -p rilascio attestare
+          git archive --format=tar.gz --prefix="timbro-$short/" -o "rilascio/timbro-$short-sorgenti.tar.gz" "$TAG"
+          cp "rilascio/timbro-$short-sorgenti.tar.gz" attestare/
+
+      - name: Controllo del wrapper di Gradle
+        if: steps.v.outputs.app == '1'
+        uses: gradle/actions/wrapper-validation@7296c772c13d12d9871528814b51fb2143c138ef  # v6.4.1
+
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78  # v6.2.0
+        if: steps.v.outputs.app == '1'
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: App (bundle firmato con la chiave di caricamento)
+        if: steps.v.outputs.app == '1'
+        working-directory: android
+        env:
+          UPLOAD_KEYSTORE_B64: ${{ secrets.UPLOAD_KEYSTORE_B64 }}
+          UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.UPLOAD_KEYSTORE_PASSWORD }}
+          TIMBRO_API_BASE: ${{ secrets.TIMBRO_API_BASE }}
+          TIMBRO_ENROLL_BASE: ${{ secrets.TIMBRO_ENROLL_BASE }}
+          NUMERO: ${{ steps.v.outputs.numero }}
+          SHORT: ${{ steps.v.outputs.short }}
+        run: |
+          set -euo pipefail
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          printf '%s' "$UPLOAD_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          printf 'storeFile=%s\nstorePassword=%s\nkeyAlias=upload\nkeyPassword=%s\n' \
+            "$RUNNER_TEMP/upload.jks" "$UPLOAD_KEYSTORE_PASSWORD" "$UPLOAD_KEYSTORE_PASSWORD" > keystore.properties
+          ./gradlew --no-daemon :core:test :app:bundleRelease \
+            -Ptimbro.versionCode="$NUMERO" -Ptimbro.gitSha="$SHORT" \
+            -Ptimbro.apiBase="$TIMBRO_API_BASE" -Ptimbro.enrollBase="$TIMBRO_ENROLL_BASE"
+          rm -f keystore.properties "$RUNNER_TEMP/upload.jks"
+          cp app/build/outputs/bundle/release/app-release.aab "$GITHUB_WORKSPACE/attestare/timbro-0.1.$NUMERO.aab"
+
+      - name: Impronte dell'app
+        if: steps.v.outputs.app == '1'
+        env:
+          NUMERO: ${{ steps.v.outputs.numero }}
+          SHORT: ${{ steps.v.outputs.short }}
+        run: |
+          set -euo pipefail
+          aab="attestare/timbro-0.1.$NUMERO.aab"
+          mkdir "$RUNNER_TEMP/aab" && unzip -q "$aab" -d "$RUNNER_TEMP/aab"
+          {
+            echo "# Timbro 0.1.$NUMERO ($SHORT): impronte SHA-256 del bundle e del codice che contiene."
+            echo "# Il bundle non si pubblica (contiene gli indirizzi del server): l'ha caricato questo flusso su Google Play."
+            echo "# Confronto con l'app installata: adb shell pm path it.zawardo.timbro, adb pull del base.apk,"
+            echo "# unzip, sha256sum classes*.dex: devono coincidere con base/dex/ qui sotto."
+            printf '%s  %s\n' "$(sha256sum "$aab" | cut -d' ' -f1)" "timbro-0.1.$NUMERO.aab"
+            (cd "$RUNNER_TEMP/aab" && find base/dex base/lib -type f 2>/dev/null | sort | xargs -r sha256sum)
+          } > "rilascio/timbro-$SHORT-impronte-app.txt"
+          cat "rilascio/timbro-$SHORT-impronte-app.txt"
+
+      - name: Marche temporali qualificate (ACCV, Sectigo) e OpenTimestamps
+        env:
+          SHORT: ${{ steps.v.outputs.short }}
+        run: |
+          set -euo pipefail
+          cat timbro/stamping/roots/accv*.pem > "$RUNNER_TEMP/accv.pem"
+          cp timbro/stamping/roots/sectigo-q.pem "$RUNNER_TEMP/sectigo-q.pem"
+          python3 -m venv "$RUNNER_TEMP/ots" && "$RUNNER_TEMP/ots/bin/pip" install --quiet "opentimestamps-client>=0.7,<0.8"
+          for f in attestare/*; do
+            d=$(sha256sum "$f" | cut -d' ' -f1)
+            nome=$(basename "$f")
+            for tsa in accv sectigo-q; do
+              case $tsa in
+                accv) url=http://tss.accv.es:8318/tsa ;;
+                sectigo-q) url=http://timestamp.sectigo.com/qualified; sleep 15 ;;  # Sectigo: una richiesta ogni 15 s
+              esac
+              openssl ts -query -digest "$d" -sha256 -cert -out "$RUNNER_TEMP/richiesta.tsq"
+              curl -fsS --retry 3 --retry-delay 20 -H 'Content-Type: application/timestamp-query' \
+                --data-binary @"$RUNNER_TEMP/richiesta.tsq" "$url" -o "rilascio/$nome.$tsa.tsr"
+              openssl ts -verify -digest "$d" -in "rilascio/$nome.$tsa.tsr" -CAfile "$RUNNER_TEMP/$tsa.pem" > /dev/null
+              echo "$nome · $tsa · $(openssl ts -reply -in "rilascio/$nome.$tsa.tsr" -text | sed -n 's/^Time stamp: //p')"
+            done
+            "$RUNNER_TEMP/ots/bin/ots" stamp "$f"
+            mv "$f.ots" "rilascio/$nome.ots"
+          done
+
+      - name: Attestazione di provenienza (GitHub, Sigstore)
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
+        with:
+          subject-path: attestare/*
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT: ${{ steps.v.outputs.commit }}
+          NUMERO: ${{ steps.v.outputs.numero }}
+          DATA: ${{ steps.v.outputs.data }}
+          SHORT: ${{ steps.v.outputs.short }}
+          APP: ${{ steps.v.outputs.app }}
+          PREV: ${{ steps.v.outputs.prev }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            # rilancio dopo un errore successivo (per esempio Google Play): la release, immutabile, resta quella
+            # già pubblicata, e il bundle da caricare deve essere identico a quello delle sue impronte
+            if [ "$APP" = 1 ]; then
+              gh release download "$TAG" -p "timbro-$SHORT-impronte-app.txt" -D "$RUNNER_TEMP/pubblicata"
+              atteso=$(grep "timbro-0.1.$NUMERO.aab" "$RUNNER_TEMP/pubblicata/timbro-$SHORT-impronte-app.txt" | cut -d' ' -f1)
+              [ "$atteso" = "$(sha256sum "attestare/timbro-0.1.$NUMERO.aab" | cut -d' ' -f1)" ] || {
+                echo "::error::il bundle ricostruito è diverso da quello della release già pubblicata: non lo carico"; exit 1; }
+            fi
+            echo "release $TAG già pubblicata"
+            exit 0
+          fi
+          (cd rilascio && sha256sum * > SHA256SUMS)
+          repo="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+          {
+            echo "Sorgenti di Timbro al commit \`$COMMIT\` del repository di sviluppo (numero $NUMERO, $DATA)."
+            echo
+            if [ "$APP" = 1 ]; then
+              echo "**App 0.1.$NUMERO**: costruita da questo flusso dai sorgenti del tag e caricata nel test interno di"
+              echo "Google Play, che la firma con la propria chiave (Play App Signing). Impronte in \`timbro-$SHORT-impronte-app.txt\`."
+            else
+              echo "**App**: non cambiata, resta quella della release \`$PREV\`."
+            fi
+            echo
+            echo "### Come verificare"
+            echo "- archivio: \`sha256sum -c SHA256SUMS\`"
+            echo "- marche qualificate (ACCV, Sectigo): \`openssl ts -verify -data timbro-$SHORT-sorgenti.tar.gz -in timbro-$SHORT-sorgenti.tar.gz.accv.tsr -CAfile <radice ACCV>\` (radici in \`timbro/stamping/roots/\`)"
+            echo "- Bitcoin: \`ots verify timbro-$SHORT-sorgenti.tar.gz.ots\` (prima \`ots upgrade\` se in attesa)"
+            echo "- provenienza: \`gh attestation verify timbro-$SHORT-sorgenti.tar.gz --repo $GITHUB_REPOSITORY\`"
+            echo "- flusso e log di questa costruzione: $repo/actions/runs/$GITHUB_RUN_ID"
+          } > "$RUNNER_TEMP/note.md"
+          gh release create "$TAG" rilascio/* --verify-tag --title "Timbro 0.1.$NUMERO ($SHORT)" --notes-file "$RUNNER_TEMP/note.md"
+
+      - name: Caricamento su Google Play (test interno)
+        if: steps.v.outputs.app == '1'
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          NUMERO: ${{ steps.v.outputs.numero }}
+          SHORT: ${{ steps.v.outputs.short }}
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/play" && "$RUNNER_TEMP/play/bin/pip" install --quiet "google-auth[requests]>=2.40,<3"
+          "$RUNNER_TEMP/play/bin/python" strumenti/carica_su_play.py "attestare/timbro-0.1.$NUMERO.aab" "Timbro 0.1.$NUMERO ($SHORT)"

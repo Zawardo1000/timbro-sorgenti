@@ -1,0 +1,555 @@
+{
+  "nota": "Casi del calcolo delle ore valide (timbro/orario.py e android/core). Li controllano tests/test_orario.py e i test Kotlin. Ore locali HH:MM; 'now' = giornata in corso contata fino a quell'ora. adjustments e anomalies: codici e parametri, nell'ordine.",
+  "schedule": {
+    "versions": [
+      {
+        "valid_from": "2026-01-01",
+        "days": {
+          "1": {
+            "due_min": 480,
+            "pause": true
+          },
+          "2": {
+            "due_min": 480,
+            "pause": true
+          },
+          "3": {
+            "due_min": 480,
+            "pause": true
+          },
+          "4": {
+            "due_min": 480,
+            "pause": true
+          },
+          "5": {
+            "due_min": 240,
+            "pause": false
+          }
+        },
+        "entry_from": "07:30:00",
+        "entry_to": "09:30:00",
+        "pause_from": "12:15:00",
+        "pause_to": "13:15:00",
+        "pause_counted_min": 30,
+        "pause_terminal_min": 15,
+        "no_pause_after_min": 360,
+        "no_pause_deduct_min": 30
+      },
+      {
+        "valid_from": "2027-01-04",
+        "days": {
+          "1": {
+            "due_min": 540,
+            "pause": true
+          },
+          "2": {
+            "due_min": 540,
+            "pause": true
+          },
+          "3": {
+            "due_min": 540,
+            "pause": true
+          },
+          "4": {
+            "due_min": 540,
+            "pause": true
+          }
+        },
+        "entry_from": "07:30:00",
+        "entry_to": "09:30:00",
+        "pause_from": "12:15:00",
+        "pause_to": "13:15:00",
+        "pause_counted_min": 30,
+        "pause_terminal_min": 15,
+        "no_pause_after_min": 360,
+        "no_pause_deduct_min": 30
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "giornata normale, pausa di 29 minuti conteggiata 30",
+      "day": "2026-11-04",
+      "marks": [
+        [
+          "in",
+          "07:58"
+        ],
+        [
+          "out",
+          "12:31"
+        ],
+        [
+          "in",
+          "13:00"
+        ],
+        [
+          "out",
+          "17:02"
+        ]
+      ],
+      "worked_min": 514,
+      "due_min": 480,
+      "balance_min": 34,
+      "pause_min": 29,
+      "pause_counted_min": 30,
+      "open": false,
+      "complete": true,
+      "adjustments": [
+        {
+          "code": "pausa_minima",
+          "params": {
+            "durata": 29,
+            "conteggiata": 30
+          }
+        }
+      ],
+      "anomalies": []
+    },
+    {
+      "name": "entrata prima delle 7:30",
+      "day": "2026-11-02",
+      "marks": [
+        [
+          "in",
+          "07:20"
+        ],
+        [
+          "out",
+          "12:30"
+        ],
+        [
+          "in",
+          "13:05"
+        ],
+        [
+          "out",
+          "16:30"
+        ]
+      ],
+      "worked_min": 505,
+      "due_min": 480,
+      "balance_min": 25,
+      "pause_min": 35,
+      "pause_counted_min": 35,
+      "open": false,
+      "complete": true,
+      "adjustments": [
+        {
+          "code": "entrata_anticipata",
+          "params": {
+            "ora": "07:20",
+            "conteggiata_da": "07:30"
+          }
+        }
+      ],
+      "anomalies": []
+    },
+    {
+      "name": "pausa di un'ora: conta un'ora",
+      "day": "2026-11-03",
+      "marks": [
+        [
+          "in",
+          "08:00"
+        ],
+        [
+          "out",
+          "12:30"
+        ],
+        [
+          "in",
+          "13:30"
+        ],
+        [
+          "out",
+          "17:30"
+        ]
+      ],
+      "worked_min": 510,
+      "due_min": 480,
+      "balance_min": 30,
+      "pause_min": 60,
+      "pause_counted_min": 60,
+      "open": false,
+      "complete": true,
+      "adjustments": [],
+      "anomalies": []
+    },
+    {
+      "name": "rientro dopo 10 minuti: anomalia e pausa conteggiata 30",
+      "day": "2026-11-05",
+      "marks": [
+        [
+          "in",
+          "08:00"
+        ],
+        [
+          "out",
+          "12:30"
+        ],
+        [
+          "in",
+          "12:40"
+        ],
+        [
+          "out",
+          "16:40"
+        ]
+      ],
+      "worked_min": 490,
+      "due_min": 480,
+      "balance_min": 10,
+      "pause_min": 10,
+      "pause_counted_min": 30,
+      "open": false,
+      "complete": true,
+      "adjustments": [
+        {
+          "code": "pausa_minima",
+          "params": {
+            "durata": 10,
+            "conteggiata": 30
+          }
+        }
+      ],
+      "anomalies": [
+        {
+          "code": "rientro_troppo_presto",
+          "params": {
+            "durata": 10,
+            "minimo": 15
+          }
+        }
+      ]
+    },
+    {
+      "name": "uscita fuori fascia: tempo effettivo, e senza pausa si tolgono 30 minuti",
+      "day": "2026-11-09",
+      "marks": [
+        [
+          "in",
+          "08:00"
+        ],
+        [
+          "out",
+          "11:30"
+        ],
+        [
+          "in",
+          "12:00"
+        ],
+        [
+          "out",
+          "16:30"
+        ]
+      ],
+      "worked_min": 450,
+      "due_min": 480,
+      "balance_min": -30,
+      "pause_min": null,
+      "pause_counted_min": null,
+      "open": false,
+      "complete": true,
+      "adjustments": [
+        {
+          "code": "uscita_non_pausa",
+          "params": {
+            "ora": "11:30",
+            "durata": 30
+          }
+        },
+        {
+          "code": "pausa_non_fatta",
+          "params": {
+            "tolti": 30,
+            "oltre": 360
+          }
+        }
+      ],
+      "anomalies": []
+    },
+    {
+      "name": "otto ore di fila senza pausa",
+      "day": "2026-11-10",
+      "marks": [
+        [
+          "in",
+          "07:30"
+        ],
+        [
+          "out",
+          "15:30"
+        ]
+      ],
+      "worked_min": 450,
+      "due_min": 480,
+      "balance_min": -30,
+      "pause_min": null,
+      "pause_counted_min": null,
+      "open": false,
+      "complete": true,
+      "adjustments": [
+        {
+          "code": "pausa_non_fatta",
+          "params": {
+            "tolti": 30,
+            "oltre": 360
+          }
+        }
+      ],
+      "anomalies": []
+    },
+    {
+      "name": "venerdì: mezza giornata senza pausa",
+      "day": "2026-11-06",
+      "marks": [
+        [
+          "in",
+          "07:45"
+        ],
+        [
+          "out",
+          "11:45"
+        ]
+      ],
+      "worked_min": 240,
+      "due_min": 240,
+      "balance_min": 0,
+      "pause_min": null,
+      "pause_counted_min": null,
+      "open": false,
+      "complete": true,
+      "adjustments": [],
+      "anomalies": []
+    },
+    {
+      "name": "entrata dopo le 9:30",
+      "day": "2026-11-11",
+      "marks": [
+        [
+          "in",
+          "09:41"
+        ],
+        [
+          "out",
+          "12:30"
+        ],
+        [
+          "in",
+          "13:00"
+        ],
+        [
+          "out",
+          "18:00"
+        ]
+      ],
+      "worked_min": 469,
+      "due_min": 480,
+      "balance_min": -11,
+      "pause_min": 30,
+      "pause_counted_min": 30,
+      "open": false,
+      "complete": true,
+      "adjustments": [],
+      "anomalies": [
+        {
+          "code": "entrata_tardiva",
+          "params": {
+            "ora": "09:41",
+            "limite": "09:30"
+          }
+        }
+      ]
+    },
+    {
+      "name": "manca l'ultima uscita: niente saldo",
+      "day": "2026-11-12",
+      "marks": [
+        [
+          "in",
+          "08:00"
+        ],
+        [
+          "out",
+          "12:30"
+        ],
+        [
+          "in",
+          "13:00"
+        ]
+      ],
+      "worked_min": 270,
+      "due_min": 480,
+      "balance_min": null,
+      "pause_min": null,
+      "pause_counted_min": null,
+      "open": false,
+      "complete": false,
+      "adjustments": [],
+      "anomalies": [
+        {
+          "code": "uscita_mancante",
+          "params": {
+            "dopo": "13:00"
+          }
+        }
+      ]
+    },
+    {
+      "name": "sabato, giorno senza orario",
+      "day": "2026-11-07",
+      "marks": [
+        [
+          "in",
+          "09:00"
+        ],
+        [
+          "out",
+          "11:00"
+        ]
+      ],
+      "worked_min": 120,
+      "due_min": 0,
+      "balance_min": 120,
+      "pause_min": null,
+      "pause_counted_min": null,
+      "open": false,
+      "complete": true,
+      "adjustments": [],
+      "anomalies": []
+    },
+    {
+      "name": "giornata in corso",
+      "day": "2026-11-05",
+      "now": "15:00",
+      "marks": [
+        [
+          "in",
+          "07:58"
+        ],
+        [
+          "out",
+          "12:31"
+        ],
+        [
+          "in",
+          "13:00"
+        ]
+      ],
+      "worked_min": 392,
+      "due_min": 480,
+      "balance_min": null,
+      "pause_min": 29,
+      "pause_counted_min": 30,
+      "open": true,
+      "complete": false,
+      "adjustments": [
+        {
+          "code": "pausa_minima",
+          "params": {
+            "durata": 29,
+            "conteggiata": 30
+          }
+        }
+      ],
+      "anomalies": []
+    },
+    {
+      "name": "nuovo orario dal 2027: 4 giorni da 9 ore, venerdì libero",
+      "day": "2027-01-08",
+      "marks": [
+        [
+          "in",
+          "08:00"
+        ],
+        [
+          "out",
+          "10:00"
+        ]
+      ],
+      "worked_min": 120,
+      "due_min": 0,
+      "balance_min": 120,
+      "pause_min": null,
+      "pause_counted_min": null,
+      "open": false,
+      "complete": true,
+      "adjustments": [],
+      "anomalies": []
+    },
+    {
+      "name": "nuovo orario dal 2027: lunedì da 9 ore",
+      "day": "2027-01-04",
+      "marks": [
+        [
+          "in",
+          "07:30"
+        ],
+        [
+          "out",
+          "12:30"
+        ],
+        [
+          "in",
+          "13:00"
+        ],
+        [
+          "out",
+          "17:00"
+        ]
+      ],
+      "worked_min": 540,
+      "due_min": 540,
+      "balance_min": 0,
+      "pause_min": 30,
+      "pause_counted_min": 30,
+      "open": false,
+      "complete": true,
+      "adjustments": [],
+      "anomalies": []
+    },
+    {
+      "name": "uscita senza entrata",
+      "day": "2026-11-04",
+      "marks": [
+        [
+          "out",
+          "08:05"
+        ],
+        [
+          "in",
+          "08:10"
+        ],
+        [
+          "out",
+          "12:30"
+        ],
+        [
+          "in",
+          "13:00"
+        ],
+        [
+          "out",
+          "17:00"
+        ]
+      ],
+      "worked_min": 500,
+      "due_min": 480,
+      "balance_min": null,
+      "pause_min": 30,
+      "pause_counted_min": 30,
+      "open": false,
+      "complete": false,
+      "adjustments": [],
+      "anomalies": [
+        {
+          "code": "entrata_mancante",
+          "params": {
+            "prima": "08:05"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,139 @@
+{
+  "nota": "Testo esatto delle mail di contestazione (timbro/mailer.py) per questi dati: la stessa anteprima deve uscire dall'app (android/core, TestoMail). hours = esito del calcolo con l'orario di orario.json. Generato da timbro/mailer.py; se il testo cambia, va rigenerato e cambiato anche nell'app.",
+  "cases": [
+    {
+      "name": "timbratura contestata, con orario e nota",
+      "full_name": "Mario Rossi",
+      "employee_number": "012345",
+      "day": "2026-11-04",
+      "punch": [
+        "out",
+        "12:31"
+      ],
+      "marks": [
+        [
+          "in",
+          "07:58"
+        ],
+        [
+          "out",
+          "12:31"
+        ],
+        [
+          "in",
+          "13:00"
+        ],
+        [
+          "out",
+          "17:02"
+        ]
+      ],
+      "with_schedule": true,
+      "url": "https://timbro.example.it/s/AbCd",
+      "valid_until": "2026-11-19",
+      "note": "Il terminale non ha registrato l'uscita.",
+      "hours": {
+        "worked_min": 514,
+        "due_min": 480,
+        "balance_min": 34
+      },
+      "subject": "Timbrature del 04/11/2026: segnalazione di disallineamento - Mario Rossi, matricola 012345",
+      "body": "Gentile ufficio,\n\nMario Rossi, matricola 012345, segnala un disallineamento tra i dati di presenza registrati dall'ente per mercoledì 4 novembre 2026 e quanto effettivamente avvenuto, in particolare per l'uscita delle 12:31.\n\nLe timbrature della giornata sono: entrata 07:58, uscita 12:31, entrata 13:00, uscita 17:02. Secondo l'articolazione oraria in vigore risultano 8 h 34 di lavoro valido, a fronte di 8 h 00 dovute (saldo +34′).\n\nOgni timbratura della giornata è documentata da una ripresa del terminale di rilevazione, firmata dal telefono e marcata temporalmente da prestatori qualificati eIDAS. Al link seguente, valido fino al 19/11/2026, si trovano i video, le firme, le marche temporali, il calcolo delle ore e le istruzioni per la verifica indipendente:\n\nhttps://timbro.example.it/s/AbCd\n\nNota: Il terminale non ha registrato l'uscita.\n\nSi chiede di verificare e regolarizzare la posizione.\n\nCordiali saluti,\nMario Rossi (matricola 012345)\n"
+    },
+    {
+      "name": "giornata intera, senza orario configurato",
+      "full_name": "Mario Rossi",
+      "employee_number": "012345",
+      "day": "2026-11-04",
+      "punch": null,
+      "marks": [
+        [
+          "in",
+          "07:58"
+        ],
+        [
+          "out",
+          "12:31"
+        ],
+        [
+          "in",
+          "13:00"
+        ],
+        [
+          "out",
+          "17:02"
+        ]
+      ],
+      "with_schedule": false,
+      "url": "https://timbro.example.it/s/AbCd",
+      "valid_until": "2026-11-19",
+      "note": null,
+      "hours": null,
+      "subject": "Timbrature del 04/11/2026: segnalazione di disallineamento - Mario Rossi, matricola 012345",
+      "body": "Gentile ufficio,\n\nMario Rossi, matricola 012345, segnala un disallineamento tra i dati di presenza registrati dall'ente per mercoledì 4 novembre 2026 e quanto effettivamente avvenuto.\n\nLe timbrature della giornata sono: entrata 07:58, uscita 12:31, entrata 13:00, uscita 17:02.\n\nOgni timbratura della giornata è documentata da una ripresa del terminale di rilevazione, firmata dal telefono e marcata temporalmente da prestatori qualificati eIDAS. Al link seguente, valido fino al 19/11/2026, si trovano i video, le firme, le marche temporali e le istruzioni per la verifica indipendente:\n\nhttps://timbro.example.it/s/AbCd\n\nSi chiede di verificare e regolarizzare la posizione.\n\nCordiali saluti,\nMario Rossi (matricola 012345)\n"
+    },
+    {
+      "name": "giornata intera con un'uscita mancante: niente saldo",
+      "full_name": "Mario Rossi",
+      "employee_number": "012345",
+      "day": "2026-11-12",
+      "punch": null,
+      "marks": [
+        [
+          "in",
+          "08:00"
+        ],
+        [
+          "out",
+          "12:30"
+        ],
+        [
+          "in",
+          "13:00"
+        ]
+      ],
+      "with_schedule": true,
+      "url": "https://timbro.example.it/s/EfGh",
+      "valid_until": "2026-11-27",
+      "note": null,
+      "hours": {
+        "worked_min": 270,
+        "due_min": 480,
+        "balance_min": null
+      },
+      "subject": "Timbrature del 12/11/2026: segnalazione di disallineamento - Mario Rossi, matricola 012345",
+      "body": "Gentile ufficio,\n\nMario Rossi, matricola 012345, segnala un disallineamento tra i dati di presenza registrati dall'ente per giovedì 12 novembre 2026 e quanto effettivamente avvenuto.\n\nLe timbrature della giornata sono: entrata 08:00, uscita 12:30, entrata 13:00. Secondo l'articolazione oraria in vigore risultano 4 h 30 di lavoro valido, a fronte di 8 h 00 dovute.\n\nOgni timbratura della giornata è documentata da una ripresa del terminale di rilevazione, firmata dal telefono e marcata temporalmente da prestatori qualificati eIDAS. Al link seguente, valido fino al 27/11/2026, si trovano i video, le firme, le marche temporali, il calcolo delle ore e le istruzioni per la verifica indipendente:\n\nhttps://timbro.example.it/s/EfGh\n\nSi chiede di verificare e regolarizzare la posizione.\n\nCordiali saluti,\nMario Rossi (matricola 012345)\n"
+    },
+    {
+      "name": "saldo negativo oltre l'ora",
+      "full_name": "Mario Rossi",
+      "employee_number": "012345",
+      "day": "2026-11-10",
+      "punch": [
+        "in",
+        "07:30"
+      ],
+      "marks": [
+        [
+          "in",
+          "07:30"
+        ],
+        [
+          "out",
+          "14:00"
+        ]
+      ],
+      "with_schedule": true,
+      "url": "https://timbro.example.it/s/IjKl",
+      "valid_until": "2026-11-25",
+      "note": null,
+      "hours": {
+        "worked_min": 360,
+        "due_min": 480,
+        "balance_min": -120
+      },
+      "subject": "Timbrature del 10/11/2026: segnalazione di disallineamento - Mario Rossi, matricola 012345",
+      "body": "Gentile ufficio,\n\nMario Rossi, matricola 012345, segnala un disallineamento tra i dati di presenza registrati dall'ente per martedì 10 novembre 2026 e quanto effettivamente avvenuto, in particolare per l'entrata delle 07:30.\n\nLe timbrature della giornata sono: entrata 07:30, uscita 14:00. Secondo l'articolazione oraria in vigore risultano 6 h 00 di lavoro valido, a fronte di 8 h 00 dovute (saldo −2 h 00).\n\nOgni timbratura della giornata è documentata da una ripresa del terminale di rilevazione, firmata dal telefono e marcata temporalmente da prestatori qualificati eIDAS. Al link seguente, valido fino al 25/11/2026, si trovano i video, le firme, le marche temporali, il calcolo delle ore e le istruzioni per la verifica indipendente:\n\nhttps://timbro.example.it/s/IjKl\n\nSi chiede di verificare e regolarizzare la posizione.\n\nCordiali saluti,\nMario Rossi (matricola 012345)\n"
+    }
+  ]
+}

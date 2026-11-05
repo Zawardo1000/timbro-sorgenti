@@ -1,0 +1,106 @@
+# Docker sul PC e nella CI: il backend con la stessa immagine (Dockerfile) e gli stessi vincoli del server, con il
+# codice del repo montato in sola lettura, piu' un Postgres solo per il PC (sul server c'e' quello condiviso).
+#   docker compose up --build        avvia Postgres e il backend (Ctrl+C per fermarli)
+#   docker compose run --rm test     controllo del codice (ruff) e test (pytest), come la CI
+#   http://127.0.0.1:8012/health     controllo di salute
+#   docker compose exec timbro python -m timbro <comando>   comandi di amministrazione (create-user, pairing-code, ...)
+# Sul PC non c'e' nginx: niente mTLS ne' limiti di frequenza, l'API risponde direttamente su 127.0.0.1:8012.
+name: timbro-dev
+
+x-app: &app
+  build:
+    context: .
+  image: local/timbro-dev
+  init: true
+  read_only: true
+  user: "10001:10001"
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  environment:
+    TZ: Europe/Rome
+    HOME: /tmp
+    XDG_CACHE_HOME: /tmp/.cache
+    WEB_HOST: 0.0.0.0
+    WEB_PORT: "8012"
+    LOG_DIR: /logs
+    DATA_DIR: /data
+    # Postgres del PC (servizio qui sotto): utente e password di prova, non segreti
+    DATABASE_URL: postgresql+psycopg://timbro:timbro@postgres:5432/timbro
+    # i test usano un database a parte, svuotato a ogni test
+    TEST_DATABASE_URL: postgresql+psycopg://timbro:timbro@postgres:5432/timbro_test
+  mem_limit: 512m
+  cpus: "0.5"
+  pids_limit: 128
+
+services:
+  timbro:
+    <<: *app
+    container_name: timbro-dev
+    command: ["python", "main.py"]
+    env_file:
+      - path: .env
+        required: false
+    depends_on:
+      postgres:
+        condition: service_healthy
+    stop_grace_period: 30s
+    volumes:
+      - .:/app:ro
+      - ./logs:/logs
+      - ./local-data:/data
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    ports:
+      - "127.0.0.1:8012:8012"
+    healthcheck:
+      test: ["CMD", "python", "-I", "-S", "-c", 'import socket; s = socket.create_connection(("127.0.0.1", 8012), 3); s.sendall(b"GET /health HTTP/1.0\r\n\r\n"); assert b" 200 " in s.recv(64)']
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+      start_interval: 5s
+
+  # Solo per il PC e la CI. Sul server il backend usa il Postgres condiviso (rete backend, DB e utente timbro).
+  postgres:
+    image: postgres:18
+    container_name: timbro-postgres-dev
+    environment:
+      POSTGRES_USER: timbro
+      POSTGRES_PASSWORD: timbro
+      POSTGRES_DB: timbro
+      TZ: Europe/Rome
+    volumes:
+      - pgdata:/var/lib/postgresql
+    ports:
+      - "127.0.0.1:5433:5432"  # per Navicat/psql dal PC (5433: la 5432 puo' essere gia' occupata)
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "timbro", "-d", "timbro"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+      start_interval: 1s
+
+  # Solo con "docker compose run --rm test": niente .env, i test non usano segreti ne' Internet
+  # (la rete serve solo a scaricare pytest e ruff, in /tmp, ogni volta)
+  test:
+    <<: *app
+    profiles: [test]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - >-
+        pip install --quiet --target /tmp/dev -r requirements-dev.txt
+        && /tmp/dev/bin/ruff check --no-cache .
+        && PYTHONPATH=/tmp/dev python -m pytest -q -p no:cacheprovider tests
+    volumes:
+      - .:/app:ro
+    tmpfs:
+      # exec: ruff è un programma installato in /tmp (il container del backend non lo permette)
+      - /tmp:size=768m,mode=1777,exec
+
+volumes:
+  pgdata:

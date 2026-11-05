@@ -1,0 +1,20 @@
+# Dipendenze dirette, con versione minima. Le versioni esatte verificate stanno in requirements.lock
+# (guida §9): la build installa prima il lock, poi questo file.
+fastapi>=0.141.1
+uvicorn>=0.53.0
+pydantic-settings>=2.15.0
+jinja2>=3.1.6
+sqlalchemy>=2.0.54
+alembic>=1.20.0
+psycopg[binary]>=3.3.8
+httpx>=0.28.1
+cryptography>=50.0.1
+# marche RFC 3161: richieste e risposte (asn1crypto), firma dei token e catene di certificati (pyhanko)
+asn1crypto>=1.5.1
+pyhanko>=0.37.0
+pyhanko-certvalidator>=0.32.1
+# client HTTP che pyhanko usa per OCSP/CRL; tsa.py lo importa direttamente
+aiohttp>=3.14.3
+# prove OpenTimestamps (solo la libreria di base: la CLI su Windows non parte)
+opentimestamps>=0.4.5
+tzdata>=2026.4

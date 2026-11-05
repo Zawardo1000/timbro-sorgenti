@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icona: orologio con spunta su sfumatura blu-verde acqua. Il primo piano è il segno bianco estratto dall'immagine
+     (android/play/genera_icona.py); lo stesso segno fa da icona monocromatica per i temi di Android 13+. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+    <monochrome android:drawable="@mipmap/ic_launcher_foreground" />
+</adaptive-icon>

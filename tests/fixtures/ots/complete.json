@@ -1,0 +1,13 @@
+{
+  "digest": "cfe50ee7ceff71cded98ed29b7822ed0a9545ea61330373ed3a22a9adbfc9482",
+  "calendars": [
+    "https://a.pool.opentimestamps.org",
+    "https://b.pool.opentimestamps.org",
+    "https://a.pool.eternitywall.com",
+    "https://ots.btc.catallaxy.com"
+  ],
+  "block_height": 974681,
+  "block_hash": "00000000000000000001450cba3d9ee008b0ce7c9133b20bfefc93360b415b87",
+  "block_header": "00c0bb28f2ebe33108acd81954d238535c86e673a61ab71ceb4c010000000000000000007f819fa4edf0ff2efb1245e90765e59712c021578cb0bcaa12308fbf71488af105a2ec6aace5011775c33b65",
+  "nota": "Prova OTS vera di una timbratura di prova (05/11/2026, solo un'impronta), con l'intestazione del blocco da blockstream.info e mempool.space"
+}

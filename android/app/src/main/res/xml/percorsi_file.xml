@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- FileProvider (Dettaglio → "Scarica il pacchetto di prova"): solo i pacchetti nella cache, per il selettore di Android. -->
+<paths>
+    <cache-path name="prove" path="prove/" />
+</paths>

@@ -1,0 +1,30 @@
+# Android (android/, M3)
+.tools/
+.gradle/
+build/
+local.properties
+*.keystore
+*.jks
+keystore.properties
+server.properties
+.idea/
+.kotlin/
+dist/
+android/shots/
+
+# Python
+__pycache__/
+.venv/
+*.pyc
+.pytest_cache/
+
+# Backend sul PC: segreti, log, dati, prove
+.env
+logs/
+local-data/
+scratch/
+# vecchia cartella del backend (venv di uv), da cancellare
+backend/
+
+# app bundle per Google Play (android/dist: solo l ultimo, generato da bundleRelease)
+android/dist/

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fondo dell'icona: sfumatura dal blu al verde acqua, misurata sull'immagine originale (android/play/genera_icona.py).
+     Inizio e fine coincidono con i bordi del quadrato visibile (72dp al centro dei 108dp dell'icona adattiva). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="54" android:startY="16.65" android:endX="54" android:endY="91.35"
+                android:startColor="#FF0A65D0" android:endColor="#FF27CDA6" />
+        </aapt:attr>
+    </path>
+</vector>
