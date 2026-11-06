@@ -115,16 +115,19 @@ def verify_archive(s: Session, today: date | None = None, videos_dir: Path | Non
         if day < today and day not in stamped_days:
             r.warnings.append(f"giorno {day}: nessuna marca giornaliera della catena")
 
-    # 4. riverifica offline dei token RFC 3161 completati, a blocchi (token e risposte OCSP pesano)
+    # 4. riverifica offline dei token RFC 3161 completati, a blocchi (token e risposte OCSP pesano). Si leggono le
+    # colonne, non oggetti Stamp: le righe non entrano nella sessione e la memoria resta quella di un blocco, senza
+    # svuotare la sessione a metà lettura (expunge_all durante yield_per rompe il blocco successivo)
     rows = s.execute(
-        select(Stamp)
+        select(
+            Stamp.id, Stamp.provider, Stamp.request, Stamp.token, Stamp.digest, Stamp.revinfo_json, Stamp.gen_time,
+            Stamp.qualified,
+        )
         .where(Stamp.kind == "rfc3161", Stamp.status == "complete")
         .order_by(Stamp.id)
         .execution_options(yield_per=100)
-    ).scalars()
-    for n, st in enumerate(rows, 1):
-        if n % 100 == 0:
-            s.expunge_all()  # le timbrature restano in "punches", già caricate
+    )
+    for st in rows:
         r.stamps_checked += 1
         try:
             nonce = tsp.TimeStampReq.load(st.request)["nonce"].native

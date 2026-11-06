@@ -191,6 +191,28 @@ def test_verifica_controlla_i_file_video(app, phone):
     assert any("file mancante" in e for e in rec["errors"])
 
 
+def test_verifica_con_piu_di_un_blocco_di_marche(app):
+    """Oltre 100 marche RFC 3161 completate la lettura passa al blocco successivo: prima si svuotava la sessione a
+    metà lettura e la verifica falliva con InvalidRequestError (06/11/2026)."""
+    from datetime import date
+
+    from timbro import checks
+    from timbro.models import Stamp
+
+    db = app.app.state.db
+    with db.session() as s:
+        for i in range(250):
+            s.add(Stamp(
+                target="chain", chain_day=date(2020, 1, 1) + timedelta(days=i), provider="accv", kind="rfc3161",
+                qualified=True, digest="00" * 32, status="complete", token=b"x",
+            ))
+        s.commit()
+    rec = checks.run_archive(db, app.app.state.settings)
+    assert rec["error"] is None
+    assert rec["stamps_checked"] == 250
+    assert not rec["ok"]  # token finti: ogni marca dà errore, ma la verifica arriva in fondo
+
+
 def test_verifica_salva_l_esito_anche_se_fallisce(app, monkeypatch):
     from timbro import checks
 
