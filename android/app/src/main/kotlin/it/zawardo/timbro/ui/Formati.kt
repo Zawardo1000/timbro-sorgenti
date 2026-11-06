@@ -35,6 +35,7 @@ fun LocalDateTime.oraMinuti(): String = format(oraMinuti)                  // 07
 fun LocalDateTime.oraSecondi(): String = format(oraSecondi)                // 07:58:12
 fun LocalTime.oraMinuti(): String = format(oraMinuti)                      // 12:15
 
-fun Duration.oreMinuti(): String = String.format(Locale.ROOT, "%d h %02d", toHours(), toMinutesPart())  // 8 h 16
+// toMinutesPart e toSecondsPart esistono solo da Android 12 (API 31): l'app parte da Android 10
+fun Duration.oreMinuti(): String = String.format(Locale.ROOT, "%d h %02d", toHours(), toMinutes() % 60)  // 8 h 16
 fun Duration.primi(): String = "${toMinutes()}′"                                                        // 29′
-fun Duration.contoAllaRovescia(): String = String.format(Locale.ROOT, "%02d:%02d", toMinutes(), toSecondsPart())  // 09:42
+fun Duration.contoAllaRovescia(): String = String.format(Locale.ROOT, "%02d:%02d", toMinutes(), seconds % 60)  // 09:42

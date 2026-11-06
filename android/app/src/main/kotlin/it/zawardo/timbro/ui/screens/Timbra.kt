@@ -10,7 +10,6 @@ import android.provider.Settings
 import android.widget.VideoView
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -84,6 +83,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.lifecycle.repeatOnLifecycle
 import it.zawardo.timbro.TimbroApp
+import it.zawardo.timbro.acquisizione.EventoRipresa
 import it.zawardo.timbro.acquisizione.RaccoltaSensori
 import it.zawardo.timbro.acquisizione.Registratore
 import it.zawardo.timbro.acquisizione.Ripresa
@@ -508,7 +508,7 @@ fun RegistrazioneScreen(tipo: Tipo, onRegistrata: (Ripresa) -> Unit, onAnnulla: 
         }
     }
 
-    val registratore = remember { Registratore(contesto) }
+    val registratore = remember { Registratore.crea(contesto) }
     var sensori by remember { mutableStateOf<RaccoltaSensori?>(null) }
     val anteprima = remember {
         PreviewView(contesto).apply {
@@ -541,11 +541,11 @@ fun RegistrazioneScreen(tipo: Tipo, onRegistrata: (Ripresa) -> Unit, onAnnulla: 
             s.avvia()
             file.value = registratore.avvia { e ->
                 when (e) {
-                    is VideoRecordEvent.Status -> millis = e.recordingStats.recordedDurationNanos / 1_000_000
-                    is VideoRecordEvent.Finalize -> {
+                    is EventoRipresa.Durata -> millis = e.ms
+                    is EventoRipresa.Fine -> {
                         registrando = false
                         val f = file.value
-                        if (Registratore.riuscita(e) && f != null && f.length() > 0) {
+                        if (e.riuscita && f != null && f.length() > 0) {
                             calcolo = true
                             scope.launch {
                                 val sha = impronta(f)
@@ -557,10 +557,9 @@ fun RegistrazioneScreen(tipo: Tipo, onRegistrata: (Ripresa) -> Unit, onAnnulla: 
                         } else {
                             f?.delete()
                             runCatching { s.concludi() }
-                            errore = "Registrazione interrotta (errore ${e.error}). Riprova."
+                            errore = "Registrazione interrotta (${e.errore}). Riprova."
                         }
                     }
-                    else -> Unit
                 }
             }
             registrando = true
@@ -583,6 +582,7 @@ fun RegistrazioneScreen(tipo: Tipo, onRegistrata: (Ripresa) -> Unit, onAnnulla: 
                 file.value?.delete()
                 sensori?.let { runCatching { it.concludi() } }
             }
+            registratore.chiudi()
         }
     }
 
@@ -738,11 +738,13 @@ fun ConfermaScreen(
             )
             Anteprima(ripresa, tipo)
             val mb = String.format(Locale.ITALIAN, "%.1f", ripresa.dimensione / 1_000_000.0)
+            // bitrate effettivo: per confrontare le due codifiche (impostazioni → video compatto)
+            val mbit = String.format(Locale.ITALIAN, "%.1f", ripresa.dimensione * 8.0 / 1000.0 / ripresa.durataMs.coerceAtLeast(1))
             val p = ripresa.posizione
             val reti = ripresa.wifi?.aps?.size ?: 0
             val sicuro = livello != "software" && livello != "?"
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Pastiglia("${(ripresa.durataMs + 500) / 1000} s · $mb MB", fondo = Colori.Rilievo, colore = Colori.Inchiostro)
+                Pastiglia("${(ripresa.durataMs + 500) / 1000} s · $mb MB · $mbit Mbit/s", fondo = Colori.Rilievo, colore = Colori.Inchiostro)
                 when {
                     p == null -> Pastiglia("Posizione non disponibile", fondo = Colori.Giallo, colore = Colori.SuColore)
                     p.isMock == true -> Pastiglia("Posizione simulata!", fondo = Colori.Giallo, colore = Colori.SuColore)

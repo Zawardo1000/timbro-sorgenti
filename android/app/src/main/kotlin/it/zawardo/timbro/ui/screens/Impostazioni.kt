@@ -1,5 +1,7 @@
 package it.zawardo.timbro.ui.screens
 
+import androidx.compose.ui.platform.LocalContext
+import it.zawardo.timbro.acquisizione.PreferenzaVideo
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -130,6 +132,15 @@ fun ImpostazioniScreen(
             RigaDato("Trusted List UE controllata", "${LocalDate.now().giornoMese()} · n. 190", divisore = false)
         }
         SchedaTelefono(collegamento, firmatario, daInviare = vm.inCoda, prima = vm::ferma) {
+            // codifica del video in prova: bitrate costante, file più piccoli (acquisizione/RegistratoreCompatto.kt)
+            val contesto = LocalContext.current
+            var compatto by remember { mutableStateOf(PreferenzaVideo.compatto(contesto)) }
+            RigaSpunta(
+                "Video compatto (prova)",
+                "Codifica a bitrate costante: file 3-4 volte più piccoli. Se una ripresa non riesce o il display non si " +
+                    "legge bene, spegnilo: si torna alla codifica di sempre.",
+                compatto, { compatto = it; PreferenzaVideo.impostaCompatto(contesto, it) },
+            )
             if (vm.io?.admin == true) {
                 // per provare: vedere l'app come la vede un utente senza il ruolo di amministratore
                 RigaSpunta(

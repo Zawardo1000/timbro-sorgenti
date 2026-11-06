@@ -18,6 +18,7 @@ import androidx.camera.video.VideoCapture
 import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import androidx.lifecycle.LifecycleOwner
 import it.zawardo.timbro.core.Orologi
 import it.zawardo.timbro.core.Posizione
@@ -71,62 +72,111 @@ fun durataMs(file: File, misurataMs: Long): Long = runCatching {
     }
 }.getOrNull() ?: misurataMs
 
+/** Quello che succede durante una ripresa: la durata registrata finora, poi la fine. */
+sealed interface EventoRipresa {
+    data class Durata(val ms: Long) : EventoRipresa
+
+    /** [riuscita]: fermata a mano o al limite dei 15 secondi, con il file completo; altrimenti [errore]. */
+    data class Fine(val riuscita: Boolean, val errore: String? = null) : EventoRipresa
+}
+
 /**
- * La fotocamera per la timbratura (CameraX): anteprima e registrazione 720p H.264 **senza audio** (il microfono non si
- * chiede nemmeno: docs/PROGETTO.md §3.1), fine automatica a [DURATA_MASSIMA_MS]. Fotocamera posteriore, quella che si
- * punta sul terminale; se non c'è, l'altra.
+ * La fotocamera per la timbratura: anteprima e registrazione 720p H.264 **senza audio** (il microfono non si chiede
+ * nemmeno: docs/PROGETTO.md §3.1), fine automatica a [DURATA_MASSIMA_MS]. Fotocamera posteriore, quella che si punta sul
+ * terminale; se non c'è, l'altra. Due codifiche: quella di CameraX ([RegistratoreCameraX]) e, in prova, quella compatta
+ * a bitrate costante ([RegistratoreCompatto]), scelta nelle impostazioni.
  */
+interface Registratore {
+    /** Collega anteprima e registrazione al ciclo di vita della schermata. */
+    suspend fun collega(proprietario: LifecycleOwner, anteprima: PreviewView)
+
+    /** Avvia la registrazione in un file nuovo; gli eventi arrivano a [onEvento] sul thread principale. */
+    fun avvia(onEvento: (EventoRipresa) -> Unit): File
+
+    fun ferma()
+
+    /** La schermata se ne va: si liberano le risorse proprie (il codificatore della codifica compatta). */
+    fun chiudi() {}
+
+    companion object {
+        const val DURATA_MASSIMA_MS = 15_000L
+
+        /** Quello scelto nelle impostazioni; senza un codificatore H.264 a bitrate costante, quello di CameraX. */
+        fun crea(contesto: Context): Registratore =
+            if (PreferenzaVideo.compatto(contesto) && RegistratoreCompatto.supportato()) RegistratoreCompatto(contesto)
+            else RegistratoreCameraX(contesto)
+    }
+}
+
+/** Scelta della codifica (in prova): preferenza del telefono, spenta finché la compatta non è provata. */
+object PreferenzaVideo {
+    private fun prefs(contesto: Context) = contesto.getSharedPreferences("video", Context.MODE_PRIVATE)
+
+    fun compatto(contesto: Context): Boolean = prefs(contesto).getBoolean("compatto", false)
+
+    fun impostaCompatto(contesto: Context, acceso: Boolean) = prefs(contesto).edit { putBoolean("compatto", acceso) }
+}
 
 /** Bitrate obiettivo del video (bit/s): il codificatore lo tiene come media, la scena ferma ne usa anche meno. */
 const val BITRATE_VIDEO = 1_000_000
 
 const val FOTOGRAMMI_AL_SECONDO = 15
 
-class Registratore(private val contesto: Context) {
+internal fun fotocamera(provider: ProcessCameraProvider): CameraSelector = when {
+    provider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA) -> CameraSelector.DEFAULT_BACK_CAMERA
+    provider.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA) -> CameraSelector.DEFAULT_FRONT_CAMERA
+    else -> error("nessuna fotocamera disponibile")
+}
+
+/** Il Recorder di CameraX con le scelte di sempre: 720p (o la qualità più vicina) e l'obiettivo di bitrate. */
+internal fun recorderDiSempre(): Recorder = Recorder.Builder()
+    .setQualitySelector(QualitySelector.from(Quality.HD, FallbackStrategy.lowerQualityOrHigherThan(Quality.HD)))
+    // display e badge, inquadratura quasi ferma: 1 Mbit/s di obiettivo (docs/PROGETTO.md §5.3; sul POCO X6 Pro
+    // 1,5 di obiettivo davano ~2,6 effettivi). Il predefinito di CameraX per l HD è ~9 Mbit/s: 7 MB per 6 s
+    .setTargetVideoEncodingBitRate(BITRATE_VIDEO)
+    .build()
+
+/**
+ * La codifica di CameraX (Recorder). Il codificatore resta in VBR, dove da Android 12 vale una soglia di qualità che
+ * alza il bitrate: sul POCO X6 Pro ~3 Mbit/s qualunque obiettivo (vedi [RegistratoreCompatto]).
+ */
+class RegistratoreCameraX(private val contesto: Context) : Registratore {
     private var cattura: VideoCapture<Recorder>? = null
     private var registrazione: Recording? = null
 
-    /** Collega anteprima e registrazione al ciclo di vita della schermata. */
-    suspend fun collega(proprietario: LifecycleOwner, anteprima: PreviewView) {
+    override suspend fun collega(proprietario: LifecycleOwner, anteprima: PreviewView) {
         val provider = ProcessCameraProvider.awaitInstance(contesto)
-        val selettore = when {
-            provider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA) -> CameraSelector.DEFAULT_BACK_CAMERA
-            provider.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA) -> CameraSelector.DEFAULT_FRONT_CAMERA
-            else -> error("nessuna fotocamera disponibile")
-        }
         val preview = Preview.Builder().build().also { it.setSurfaceProvider(anteprima.surfaceProvider) }
-        val recorder = Recorder.Builder()
-            .setQualitySelector(QualitySelector.from(Quality.HD, FallbackStrategy.lowerQualityOrHigherThan(Quality.HD)))
-            // display e badge, inquadratura quasi ferma: 1 Mbit/s di obiettivo (docs/PROGETTO.md §5.3; sul POCO X6 Pro
-            // 1,5 di obiettivo davano ~2,6 effettivi). Il predefinito di CameraX per l HD è ~9 Mbit/s: 7 MB per 6 s
-            .setTargetVideoEncodingBitRate(BITRATE_VIDEO)
-            .build()
         // 15 fotogrammi al secondo: per un display e un badge fermi bastano, e il codificatore (che sotto ~2,6 Mbit/s a
-        // 30 fps non scende, qualunque obiettivo gli si dia) usa circa metà dei bit, senza perdere nitidezza
-        val vc = VideoCapture.Builder(recorder).setTargetFrameRate(Range(FOTOGRAMMI_AL_SECONDO, FOTOGRAMMI_AL_SECONDO)).build()
+        // 30 fps non scende, qualunque obiettivo gli si dia) usa meno bit, senza perdere nitidezza
+        val vc = VideoCapture.Builder(recorderDiSempre()).setTargetFrameRate(Range(FOTOGRAMMI_AL_SECONDO, FOTOGRAMMI_AL_SECONDO)).build()
         provider.unbindAll()
-        provider.bindToLifecycle(proprietario, selettore, preview, vc)
+        provider.bindToLifecycle(proprietario, fotocamera(provider), preview, vc)
         cattura = vc
     }
 
-    /** Avvia la registrazione in un file nuovo; gli eventi (durata, fine) arrivano a [onEvento] sul thread principale. */
     @SuppressLint("MissingPermission") // nessun audio: withAudioEnabled non si chiama mai
-    fun avvia(onEvento: (VideoRecordEvent) -> Unit): File {
+    override fun avvia(onEvento: (EventoRipresa) -> Unit): File {
         val vc = cattura ?: error("fotocamera non collegata")
         val file = File(cartellaVideo(contesto), "${UUID.randomUUID()}.mp4")
-        val opzioni = FileOutputOptions.Builder(file).setDurationLimitMillis(DURATA_MASSIMA_MS).build()
-        registrazione = vc.output.prepareRecording(contesto, opzioni).start(ContextCompat.getMainExecutor(contesto), onEvento)
+        val opzioni = FileOutputOptions.Builder(file).setDurationLimitMillis(Registratore.DURATA_MASSIMA_MS).build()
+        registrazione = vc.output.prepareRecording(contesto, opzioni).start(ContextCompat.getMainExecutor(contesto)) { e ->
+            when (e) {
+                is VideoRecordEvent.Status -> onEvento(EventoRipresa.Durata(e.recordingStats.recordedDurationNanos / 1_000_000))
+                is VideoRecordEvent.Finalize ->
+                    onEvento(if (riuscita(e)) EventoRipresa.Fine(true) else EventoRipresa.Fine(false, "errore ${e.error}"))
+                else -> Unit
+            }
+        }
         return file
     }
 
-    fun ferma() {
+    override fun ferma() {
         registrazione?.stop()
         registrazione = null
     }
 
-    companion object {
-        const val DURATA_MASSIMA_MS = 15_000L
-
+    private companion object {
         /** La registrazione è finita bene: fermata a mano o al limite dei 15 secondi. */
         fun riuscita(fine: VideoRecordEvent.Finalize): Boolean =
             !fine.hasError() || fine.error == VideoRecordEvent.Finalize.ERROR_DURATION_LIMIT_REACHED
