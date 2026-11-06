@@ -118,3 +118,19 @@ def test_verifica_confronta_lo_script_con_quello_pubblicato(app, phone, server_v
     out = capsys.readouterr().out
     assert rep.errors == errors + 1 and "ERR  questo script è identico a quello pubblicato" in out
     assert Path(vp.__file__).name == "verifica.py"
+
+    # in caso di dubbi: lo script scaricato da GitHub, lanciato da fuori sulla cartella del pacchetto, controlla anche
+    # il verifica.py arrivato col pacchetto
+    pages[raw] = script
+    fuori = tmp_path / "scaricato" / "verifica-github.py"
+    fuori.parent.mkdir()
+    fuori.write_bytes(script)
+    monkeypatch.setattr(vp, "__file__", str(fuori))
+    rep = vp.verify_package(folder, online=True)
+    out = capsys.readouterr().out
+    assert "OK   il verifica.py del pacchetto è identico a quello pubblicato per il server 1234567" in out
+    assert rep.errors == errors
+    (folder / "verifica.py").write_bytes(script + b"\n# manomesso\n")
+    rep = vp.verify_package(folder, online=True)
+    out = capsys.readouterr().out
+    assert rep.errors == errors + 1 and "ERR  il verifica.py del pacchetto è identico a quello pubblicato" in out

@@ -1132,7 +1132,7 @@ def verify_package(here, online=True):
     _time_coherence(rep, t, json.loads(manifest), stamp_times)
 
     rep.section("7. Provenienza del codice")
-    _provenance(rep, rec.get("provenienza") or {}, src)
+    _provenance(rep, rec.get("provenienza") or {}, src, here)
 
     print("\n" +("TUTTO VERIFICATO" if rep.errors == 0 else "CI SONO ERRORI (%d)" % rep.errors))
     if rep.warnings:
@@ -1282,9 +1282,10 @@ def _release(src, commit):
         return None
 
 
-def _provenance(rep, prov, src):
+def _provenance(rep, prov, src, here=None):
     """Versioni del codice e release pubbliche (docs/PROGETTO.md §25). Il confronto vale solo se lo script che lo fa
-    è quello vero: chi non vuole fidarsi lo scarica dall'indirizzo stampato e confronta l'impronta da sé."""
+    è quello vero: in caso di dubbi si usa lo script scaricato dai sorgenti pubblicati, lanciato sulla cartella del
+    pacchetto, che controlla anche il verifica.py del pacchetto."""
     mine = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
     rep.info("impronta SHA-256 di questo script: %s" % mine)
     app = prov.get("app") or {}
@@ -1304,6 +1305,11 @@ def _provenance(rep, prov, src):
             rep.attn("script pubblicato non scaricato (%s)" % e)
         else:
             rep.check(published == mine, "questo script è identico a quello pubblicato per il server %s" % pkg[:7])
+            # lanciato da fuori (scaricato da GitHub): si controlla anche lo script arrivato col pacchetto
+            packaged = Path(here) / "verifica.py" if here else None
+            if packaged and packaged.is_file() and packaged.resolve() != Path(__file__).resolve():
+                rep.check(hashlib.sha256(packaged.read_bytes()).hexdigest() == published,
+                          "il verifica.py del pacchetto è identico a quello pubblicato per il server %s" % pkg[:7])
     else:
         rep.attn("versione del server del pacchetto non registrata: script non confrontabile")
     for label, commit in (("app", app.get("commit")), ("server alla ricezione", server)):

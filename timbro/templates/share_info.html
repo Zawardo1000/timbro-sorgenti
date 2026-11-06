@@ -232,10 +232,12 @@
   Un perito può estrarre l'app dal telefono e confrontarle. La stessa riga indica la versione del server che ha
   ricevuto la timbratura, con i suoi sorgenti.</p>
   <h3>E il server?</h3>
-  <p>Il server non ha un'attestazione hardware come il telefono: la sua versione è registrata e il suo codice è
-  pubblico, ma soprattutto non serve fidarsi di lui. Tutto ciò che afferma si ricontrolla dal pacchetto di prova
-  contro Google, i prestatori qualificati e Bitcoin, e lo script di verifica del pacchetto è identico a quello
-  pubblicato per quella versione: lo controlla da sé.</p>
+  <p>Il server non ha un'attestazione hardware come il telefono: la sua versione è <strong>dichiarata, non
+  dimostrata</strong>, e nessuno può provare quale codice girasse davvero. Per questo nessuna prova dipende da essa:
+  tutto ciò che il server afferma si ricontrolla dal pacchetto di prova contro Google, i prestatori qualificati e
+  Bitcoin, sul computer di chi verifica. Anche lo script di verifica arriva dal server, dentro il pacchetto: in caso
+  di dubbi si scarica lo stesso file dai sorgenti pubblicati e si usa quello, che controlla anche lo script del
+  pacchetto (istruzioni in <code>VERIFICA.md</code>).</p>
   {{ close("provenienza") }}
 </div>
 
@@ -250,7 +252,8 @@
   le radici pubblicate da Google, la Trusted List europea per i prestatori qualificati, i siti degli altri
   prestatori, due archivi pubblici della blockchain. Il codice è leggibile, e gli stessi controlli si ripetono con
   <code>openssl</code> e <code>ots</code>. Un consulente tecnico può rifare ogni passaggio su un computer
-  qualsiasi.</p>
+  qualsiasi. Lo script è nel pacchetto; chi non vuole fidarsi nemmeno di quello scarica lo stesso file dai sorgenti
+  pubblicati su GitHub.</p>
   {{ close("verifica") }}
 </div>
 
