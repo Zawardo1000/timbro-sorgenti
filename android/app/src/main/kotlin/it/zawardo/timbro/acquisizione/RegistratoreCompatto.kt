@@ -10,6 +10,7 @@ import android.media.MediaMuxer
 import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.SystemClock
 import android.util.Log
 import android.util.Range
 import android.view.Surface
@@ -28,7 +29,7 @@ import java.util.concurrent.Executor
 private const val TAG = "Timbro.Codifica"
 
 /**
- * Codifica compatta (in prova): stessa fotocamera, stessa risoluzione scelta da CameraX (720p) e 15 fotogrammi al
+ * Codifica compatta (predefinita dal 06/11/2026, ripiego su CameraX in [CodificaVideo]): stessa fotocamera, stessa risoluzione scelta da CameraX (720p) e 15 fotogrammi al
  * secondo, senza audio, ma il video lo codifica un MediaCodec H.264 nostro **a bitrate costante (CBR)**, con un
  * fotogramma chiave ogni [SECONDI_TRA_CHIAVI] secondi.
  *
@@ -118,11 +119,12 @@ class RegistratoreCompatto(private val contesto: Context) : Registratore {
         /** C'è un codificatore H.264 per il 720p da usare così? Senza, si resta su CameraX. */
         fun supportato(): Boolean = scegli(1280, 720) != null
 
-        /** Per le impostazioni: quale codificatore userebbe la codifica compatta e se dichiara il CBR. */
-        fun descriviScelta(): String = scegli(1280, 720)?.let {
-            "${it.nome} (${if (it.hardware) "hardware" else "software"}): " +
-                if (it.cbrDichiarato) "CBR dichiarato" else "CBR non dichiarato, si chiede lo stesso"
-        } ?: "nessun codificatore adatto: resta la codifica di sempre"
+        /** Per la scheda del telefono: (breve, dettaglio) della codifica compatta, o CameraX senza codificatore adatto. */
+        fun descriviScelta(): Pair<String, String> = scegli(1280, 720)?.let {
+            "compatta · ${BITRATE_COMPATTO / 1000} kbit/s" to
+                "Codificatore ${it.nome} (${if (it.hardware) "hardware" else "software"}), bitrate costante" +
+                if (it.cbrDichiarato) "." else " (non dichiarato dal telefono, rispettato)."
+        } ?: ("CameraX" to "Nessun codificatore adatto alla codifica compatta.")
     }
 
     /** Il codificatore scelto da [scegli]. */
@@ -144,7 +146,7 @@ private class Codificatore {
     private val gestore = Handler(thread.looper)
     private val qui = Executor { gestore.post(it) }
 
-    private class Richiesta(val file: File, val evento: (EventoRipresa) -> Unit)
+    private class Richiesta(val file: File, val evento: (EventoRipresa) -> Unit, val avviataMs: Long = SystemClock.elapsedRealtime())
 
     private var codec: MediaCodec? = null
     private var superficie: Surface? = null
@@ -190,7 +192,7 @@ private class Codificatore {
         val scelta = RegistratoreCompatto.scegli(dim.width, dim.height)
         if (scelta == null) {
             request.willNotProvideSurface()
-            concludi("nessun codificatore H.264 per ${dim.width}x${dim.height}")
+            concludi("nessun codificatore H.264 per ${dim.width}x${dim.height}", guasto = true)
             return
         }
         // CBR; se il codificatore lo rifiuta, VBR (resta il fotogramma chiave ogni 5 s)
@@ -215,7 +217,7 @@ private class Codificatore {
         }
         if (c == null) {
             request.willNotProvideSurface()
-            concludi("il codificatore ${scelta.nome} non accetta il formato")
+            concludi("il codificatore ${scelta.nome} non accetta il formato", guasto = true)
             return
         }
         try {
@@ -238,7 +240,7 @@ private class Codificatore {
             Log.w(TAG, "codificatore non avviato", e)
             runCatching { c.release() }
             request.willNotProvideSurface()
-            concludi("codificatore non avviato: ${e.message}")
+            concludi("codificatore non avviato: ${e.message}", guasto = true)
         }
     }
 
@@ -258,7 +260,7 @@ private class Codificatore {
                 if (c === codec) scrivi(c, indice, info)
             } catch (e: Exception) {
                 Log.w(TAG, "scrittura del video non riuscita", e)
-                concludi("scrittura del video non riuscita: ${e.message}")
+                concludi("scrittura del video non riuscita: ${e.message}", guasto = true)
             } finally {
                 runCatching { c.releaseOutputBuffer(indice, false) }
             }
@@ -267,7 +269,7 @@ private class Codificatore {
         override fun onError(c: MediaCodec, e: MediaCodec.CodecException) {
             Log.w(TAG, "errore del codificatore", e)
             if (c === codec) {
-                concludi("errore del codificatore: ${e.diagnosticInfo}")
+                concludi("errore del codificatore: ${e.diagnosticInfo}", guasto = true)
                 rilascia(c, superficie)
             }
         }
@@ -302,8 +304,11 @@ private class Codificatore {
         }
     }
 
-    /** Chiude la ripresa in corso: con [errore] null è riuscita se c'è almeno un fotogramma nel file. */
-    private fun concludi(errore: String?) {
+    /**
+     * Chiude la ripresa in corso: con [errore] null è riuscita se c'è almeno un fotogramma nel file. [guasto]: colpa del
+     * codificatore (si passa a CameraX); lo è anche una ripresa fermata dopo 3 s senza nessun fotogramma.
+     */
+    private fun concludi(errore: String?, guasto: Boolean = false) {
         val r = richiesta ?: return
         richiesta = null
         val m = muxer
@@ -312,11 +317,12 @@ private class Codificatore {
         m?.let { runCatching { it.release() } }
         scritti = 0
         ultimoAvviso = -1L
+        val muto = errore == null && !chiuso && SystemClock.elapsedRealtime() - r.avviataMs >= 3_000
         r.evento(
             when {
                 errore == null && chiuso -> EventoRipresa.Fine(true)
-                errore == null -> EventoRipresa.Fine(false, "nessun fotogramma registrato")
-                else -> EventoRipresa.Fine(false, errore)
+                errore == null -> EventoRipresa.Fine(false, "nessun fotogramma registrato", guastoCodifica = muto)
+                else -> EventoRipresa.Fine(false, errore, guastoCodifica = guasto)
             },
         )
     }

@@ -57,6 +57,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -83,6 +84,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.dropUnlessResumed
 import androidx.lifecycle.repeatOnLifecycle
 import it.zawardo.timbro.TimbroApp
+import it.zawardo.timbro.acquisizione.CodificaVideo
 import it.zawardo.timbro.acquisizione.EventoRipresa
 import it.zawardo.timbro.acquisizione.RaccoltaSensori
 import it.zawardo.timbro.acquisizione.Registratore
@@ -508,7 +510,11 @@ fun RegistrazioneScreen(tipo: Tipo, onRegistrata: (Ripresa) -> Unit, onAnnulla: 
         }
     }
 
-    val registratore = remember { Registratore.crea(contesto) }
+    var tentativo by remember { mutableIntStateOf(0) }
+    // nuovo a ogni tentativo: dopo un guasto della codifica compatta, "Riprova" usa CameraX (CodificaVideo)
+    val registratore = remember(tentativo) { Registratore.crea(contesto) }
+    DisposableEffect(registratore) { onDispose { registratore.chiudi() } }
+    val registratoreAttuale by rememberUpdatedState(registratore)
     var sensori by remember { mutableStateOf<RaccoltaSensori?>(null) }
     val anteprima = remember {
         PreviewView(contesto).apply {
@@ -521,7 +527,6 @@ fun RegistrazioneScreen(tipo: Tipo, onRegistrata: (Ripresa) -> Unit, onAnnulla: 
     var registrando by remember { mutableStateOf(false) }
     var calcolo by remember { mutableStateOf(false) }
     var errore by remember { mutableStateOf<String?>(null) }
-    var tentativo by remember { mutableIntStateOf(0) }
     var precisione by remember { mutableStateOf<Float?>(null) }
     var fonte by remember { mutableStateOf<String?>(null) }
     var reti by remember { mutableIntStateOf(0) }
@@ -562,7 +567,9 @@ fun RegistrazioneScreen(tipo: Tipo, onRegistrata: (Ripresa) -> Unit, onAnnulla: 
                         } else {
                             f?.delete()
                             runCatching { s.concludi() }
-                            errore = "Registrazione interrotta (${e.errore}). Riprova."
+                            if (e.guastoCodifica) CodificaVideo.segnaGuasto(contesto, e.errore)
+                            errore = "Registrazione interrotta (${e.errore}). Riprova." +
+                                if (e.guastoCodifica) " Il nuovo tentativo usa la codifica di sempre." else ""
                         }
                     }
                 }
@@ -583,11 +590,10 @@ fun RegistrazioneScreen(tipo: Tipo, onRegistrata: (Ripresa) -> Unit, onAnnulla: 
     DisposableEffect(Unit) {
         onDispose {
             if (!consegnata.value) {
-                registratore.ferma()
+                registratoreAttuale.ferma()
                 file.value?.delete()
                 sensori?.let { runCatching { it.concludi() } }
             }
-            registratore.chiudi()
         }
     }
 

@@ -20,6 +20,7 @@ import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.lifecycle.LifecycleOwner
+import it.zawardo.timbro.BuildConfig
 import it.zawardo.timbro.core.Orologi
 import it.zawardo.timbro.core.Posizione
 import it.zawardo.timbro.core.Wifi
@@ -78,15 +79,18 @@ fun durataMs(file: File, misurataMs: Long): Long = runCatching {
 sealed interface EventoRipresa {
     data class Durata(val ms: Long) : EventoRipresa
 
-    /** [riuscita]: fermata a mano o al limite dei 15 secondi, con il file completo; altrimenti [errore]. */
-    data class Fine(val riuscita: Boolean, val errore: String? = null) : EventoRipresa
+    /**
+     * [riuscita]: fermata a mano o al limite dei 15 secondi, con il file completo; altrimenti [errore]. [guastoCodifica]:
+     * l'errore è del codificatore della codifica compatta, e dal tentativo dopo si usa CameraX ([CodificaVideo]).
+     */
+    data class Fine(val riuscita: Boolean, val errore: String? = null, val guastoCodifica: Boolean = false) : EventoRipresa
 }
 
 /**
  * La fotocamera per la timbratura: anteprima e registrazione 720p H.264 **senza audio** (il microfono non si chiede
  * nemmeno: docs/PROGETTO.md §3.1), fine automatica a [DURATA_MASSIMA_MS]. Fotocamera posteriore, quella che si punta sul
- * terminale; se non c'è, l'altra. Due codifiche: quella di CameraX ([RegistratoreCameraX]) e, in prova, quella compatta
- * a bitrate costante ([RegistratoreCompatto]), scelta nelle impostazioni.
+ * terminale; se non c'è, l'altra. Due codifiche: quella compatta a bitrate costante ([RegistratoreCompatto]), predefinita,
+ * e quella di CameraX ([RegistratoreCameraX]), il ripiego automatico ([CodificaVideo]).
  */
 interface Registratore {
     /** Collega anteprima e registrazione al ciclo di vita della schermata. */
@@ -106,20 +110,37 @@ interface Registratore {
     companion object {
         const val DURATA_MASSIMA_MS = 15_000L
 
-        /** Quello scelto nelle impostazioni; senza un codificatore H.264 a bitrate costante, quello di CameraX. */
+        /** La codifica compatta; CameraX se il telefono non ha un codificatore adatto o se la compatta si è guastata. */
         fun crea(contesto: Context): Registratore =
-            if (PreferenzaVideo.compatto(contesto) && RegistratoreCompatto.supportato()) RegistratoreCompatto(contesto)
-            else RegistratoreCameraX(contesto)
+            if (CodificaVideo.compatta(contesto)) RegistratoreCompatto(contesto) else RegistratoreCameraX(contesto)
     }
 }
 
-/** Scelta della codifica (in prova): preferenza del telefono, spenta finché la compatta non è provata. */
-object PreferenzaVideo {
+/**
+ * Quale codifica usare. La compatta è la predefinita (docs/PROGETTO.md §5.3); se una sua ripresa fallisce per colpa del
+ * codificatore ([EventoRipresa.Fine.guastoCodifica]), il telefono lo ricorda e usa CameraX, fino alla versione
+ * successiva dell'app, che riprova la compatta.
+ */
+object CodificaVideo {
     private fun prefs(contesto: Context) = contesto.getSharedPreferences("video", Context.MODE_PRIVATE)
 
-    fun compatto(contesto: Context): Boolean = prefs(contesto).getBoolean("compatto", false)
+    private fun guasto(contesto: Context): String? =
+        prefs(contesto).takeIf { it.getLong("guasto_versione", -1L) == BuildConfig.VERSION_CODE.toLong() }?.getString("guasto_motivo", "")
 
-    fun impostaCompatto(contesto: Context, acceso: Boolean) = prefs(contesto).edit { putBoolean("compatto", acceso) }
+    fun compatta(contesto: Context): Boolean = guasto(contesto) == null && RegistratoreCompatto.supportato()
+
+    fun segnaGuasto(contesto: Context, motivo: String?) = prefs(contesto).edit {
+        putLong("guasto_versione", BuildConfig.VERSION_CODE.toLong())
+        putString("guasto_motivo", motivo.orEmpty().take(200))
+    }
+
+    /** Per la scheda del telefono: la codifica in uso (breve) e il dettaglio (codificatore, o perché CameraX). */
+    fun descrizione(contesto: Context): Pair<String, String> {
+        guasto(contesto)?.let {
+            return "CameraX (ripiego)" to "La compatta non ha funzionato: ${it.ifEmpty { "errore del codificatore" }}. Si riprova con la prossima versione dell'app."
+        }
+        return RegistratoreCompatto.descriviScelta()
+    }
 }
 
 /** Bitrate obiettivo del video (bit/s): il codificatore lo tiene come media, la scena ferma ne usa anche meno. */
