@@ -118,9 +118,11 @@ def _code(p: Punch, manifest: dict, sources: str) -> dict:
         "app": (app_version or "?").split("+", 1)[0],
         "app_commit": app_commit[:7] if app_commit else None,
         "app_release": versione.release_url(sources, app_commit) if sources and app_commit and not local_build else None,
+        "app_tree": versione.tree_url(sources, app_commit, "android") if sources and app_commit and not local_build else None,
         "app_local": local_build,
         "server": p.server_version[:7] if p.server_version else None,
         "server_release": versione.release_url(sources, p.server_version) if sources else None,
+        "server_tree": versione.tree_url(sources, p.server_version, "timbro") if sources else None,
     }
 
 

@@ -210,8 +210,8 @@ video { max-height: 70vh; object-fit: contain; }
     </dd>{{ info("posizione", "Perché la posizione è affidabile") }}</div>
     <div class="row"><dt>Registro a catena</dt><dd><code>{{ p.chain_hash }}</code></dd>{{ info("catena", "Cos'è il registro a catena") }}</div>
     <div class="row"><dt>Codice</dt><dd>
-      app <span class="mono">{{ p.code.app }}</span>{% if p.code.app_release %} · <a href="{{ p.code.app_release }}" rel="noopener noreferrer" target="_blank">sorgenti e costruzione pubblici ({{ p.code.app_commit }})</a>{% elif p.code.app_local %} · <span class="muted">compilata in prova, senza release pubblica</span>{% endif %}
-      <br>server {% if p.code.server %}<span class="mono">{{ p.code.server }}</span>{% if p.code.server_release %} · <a href="{{ p.code.server_release }}" rel="noopener noreferrer" target="_blank">sorgenti pubblici</a>{% endif %}{% else %}<span class="muted">versione non registrata</span>{% endif %}
+      app <span class="mono">{{ p.code.app }}</span>{% if p.code.app_release %} da <span class="mono">{{ p.code.app_commit }}</span> · <a href="{{ p.code.app_release }}" rel="noopener noreferrer" target="_blank">costruzione e impronte</a> · <a href="{{ p.code.app_tree }}" rel="noopener noreferrer" target="_blank">sorgenti dell'app</a>{% elif p.code.app_local %} · <span class="muted">compilata in prova, senza release pubblica</span>{% endif %}
+      <br>server {% if p.code.server %}<span class="mono">{{ p.code.server }}</span>{% if p.code.server_tree %} · <a href="{{ p.code.server_tree }}" rel="noopener noreferrer" target="_blank">sorgenti del server</a> · <a href="{{ p.code.server_release }}" rel="noopener noreferrer" target="_blank">archivio marcato</a>{% endif %}{% else %}<span class="muted">versione non registrata</span>{% endif %}
     </dd>{{ info("provenienza", "Da dove viene il codice") }}</div>
   </dl>
   </div>

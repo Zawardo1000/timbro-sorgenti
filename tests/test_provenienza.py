@@ -64,13 +64,16 @@ def _pagina_e_pacchetto(app, phone, tmp_path):
     page = app.get("/" + r.json()["url"].split("://", 1)[1].split("/", 1)[1]).text
     assert f'href="{REPO}/releases/tag/timbro-abcdef1"' in page  # app costruita dalla release pubblica
     assert f'href="{REPO}/releases/tag/timbro-1234567"' in page  # server che l'ha ricevuta
+    assert f'href="{REPO}/tree/timbro-abcdef1/android"' in page and f'href="{REPO}/tree/timbro-1234567/timbro"' in page
     assert "compilata in prova, senza release pubblica" in page  # app compilata in locale
     assert 'id="info-provenienza"' in page and "github.com/Zawardo1000/timbro-sorgenti" in page
 
     z = zipfile.ZipFile(io.BytesIO(phone.admin(app, "GET", f"/api/v1/admin/punches/{pid}/evidence.zip").content))
     prov = json.loads(z.read("record.json"))["provenienza"]
     assert prov["app"]["release"] == REPO + "/releases/tag/timbro-abcdef1"
-    assert prov["server_alla_ricezione"] == {"commit": SERVER, "release": REPO + "/releases/tag/timbro-1234567"}
+    assert prov["server_alla_ricezione"] == {"commit": SERVER, "release": REPO + "/releases/tag/timbro-1234567",
+                                             "sorgenti": REPO + "/tree/timbro-1234567/timbro"}
+    assert prov["app"]["sorgenti"] == REPO + "/tree/timbro-abcdef1/android"
     assert prov["server_del_pacchetto"]["verifica_py"].endswith("/timbro-1234567/timbro/verifica_pacchetto.py")
     instructions = z.read("VERIFICA.md").decode()
     assert "## 9. Provenienza del codice" in instructions and "sha256sum verifica.py" in instructions

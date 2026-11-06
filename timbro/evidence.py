@@ -237,13 +237,18 @@ def _provenance(p: Punch, settings: Settings) -> dict:
             "versione_attestata": attested,
             "commit": app_commit,
             "release": versione.release_url(base, app_commit) if app_commit and not local_build else None,
+            "sorgenti": versione.tree_url(base, app_commit, "android") if app_commit and not local_build else None,
             "nota": (
                 "compilata in locale con modifiche non registrate: nessuna release pubblica" if local_build else
                 "app costruita dal flusso di rilascio del repository pubblico, dai sorgenti di quella release, e "
                 "firmata da Google Play; le impronte del suo codice sono nella release (impronte-app.txt)"
             ),
         },
-        "server_alla_ricezione": {"commit": p.server_version, "release": versione.release_url(base, p.server_version)},
+        "server_alla_ricezione": {
+            "commit": p.server_version,
+            "release": versione.release_url(base, p.server_version),
+            "sorgenti": versione.tree_url(base, p.server_version, "timbro"),
+        },
         "server_del_pacchetto": {
             "commit": now,
             "release": versione.release_url(base, now),

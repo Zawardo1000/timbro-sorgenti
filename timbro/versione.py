@@ -35,6 +35,11 @@ def release_url(base: str, commit: str | None) -> str | None:
     return f"{base.rstrip('/')}/releases/tag/{tag(commit)}" if commit else None
 
 
+def tree_url(base: str, commit: str | None, path: str) -> str | None:
+    """Cartella dei sorgenti in quella versione (android/ per l'app, timbro/ per il server)."""
+    return f"{base.rstrip('/')}/tree/{tag(commit)}/{path}" if commit else None
+
+
 def file_url(base: str, commit: str, path: str) -> str:
     """Indirizzo del file così com'è in quella versione (raw.githubusercontent.com per i repository GitHub)."""
     if base.startswith("https://github.com/"):
