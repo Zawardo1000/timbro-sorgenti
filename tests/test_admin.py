@@ -161,6 +161,26 @@ def test_condivisione_completa(app, phone):
     assert app.get(f"/{path}").status_code == 404
 
 
+def test_elenco_dei_link_con_le_giornate(app, phone):
+    """Nell'app un link si riconosce dal giorno: l'elenco porta le giornate coperte (ora italiana)."""
+    from timbro.services import LOCAL_TZ, punch_time
+
+    a, _, _ = punch(app, phone)
+    b, _, _ = punch(app, phone, kind="out")
+    yesterday = datetime.now(UTC) - timedelta(days=1)
+    with app.app.state.db.session() as s:
+        s.execute(update(Punch).where(Punch.id == b).values(server_received_at=yesterday, device_time=yesterday.isoformat()))
+        s.commit()
+        days = sorted(punch_time(s.get(Punch, i)).astimezone(LOCAL_TZ).date().isoformat() for i in (a, b))
+    assert days[0] != days[1]
+    sh = share(app, phone, [a, b])
+    assert sh["days"] == days
+    elenco = phone.admin(app, "GET", "/api/v1/admin/shares").json()
+    assert elenco[0]["id"] == sh["id"] and elenco[0]["days"] == days
+    revocato = phone.admin(app, "DELETE", f"/api/v1/admin/shares/{sh['id']}").json()
+    assert revocato["days"] == days and not revocato["active"]
+
+
 def test_condivisione_porta_la_giornata_intera(app, phone):
     a, _, _ = punch(app, phone)
     b, _, _ = punch(app, phone, kind="out")

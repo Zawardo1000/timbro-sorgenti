@@ -57,7 +57,7 @@ internal object Dimostrazione {
         LinkCondivisione(
             31, "Per il sindacato", listOf(101, 102, 103), true,
             OffsetDateTime.now().minusDays(6).toString(), oggi.plusDays(9).atTime(12, 0).atOffset(OffsetDateTime.now().offset).toString(),
-            accesses = 4,
+            days = listOf(oggi.minusDays(7).toString()), accesses = 4,
         ),
     )
 

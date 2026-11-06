@@ -76,9 +76,10 @@ class GestioneTest {
             kotlinx.serialization.builtins.ListSerializer(LinkCondivisione.serializer()),
             """[{"id": 31, "label": "Per l'avvocato", "punch_ids": [121, 124], "allow_evidence_download": true,
                  "created_at": "2026-11-05T11:40:00+00:00", "expires_at": "2026-11-20T11:40:00+00:00", "revoked_at": null,
-                 "active": true, "accesses": 4}]""",
+                 "active": true, "accesses": 4, "days": ["2026-11-04", "2026-11-05"]}]""",
         )
         assertEquals(4, links.single().accesses)
+        assertEquals(listOf("2026-11-04", "2026-11-05"), links.single().days)
         assertNull(links.single().url)
         val accessi = ApiJson.decodeFromString(
             kotlinx.serialization.builtins.ListSerializer(AccessoLink.serializer()),

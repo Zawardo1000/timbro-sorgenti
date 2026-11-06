@@ -122,6 +122,8 @@ data class LinkCondivisione(
     val active: Boolean = true,
     val accesses: Int = 0,
     val url: String? = null,
+    /** Giornate coperte (ISO, ora italiana): nell'elenco un link si riconosce dal giorno. Vuoto con un server vecchio. */
+    val days: List<String> = emptyList(),
 )
 
 /** Mail di contestazione: la manda il worker del server, ritentando gli errori temporanei. */

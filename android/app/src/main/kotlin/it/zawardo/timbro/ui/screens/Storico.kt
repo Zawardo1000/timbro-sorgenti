@@ -100,6 +100,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -137,6 +138,7 @@ import it.zawardo.timbro.ui.nomeMese
 import it.zawardo.timbro.ui.oraMinuti
 import it.zawardo.timbro.ui.oraSecondi
 import it.zawardo.timbro.ui.primi
+import it.zawardo.timbro.ui.senzaAnno
 import it.zawardo.timbro.ui.settimana
 import it.zawardo.timbro.ui.theme.Colori
 import it.zawardo.timbro.ui.theme.Testo
@@ -1342,8 +1344,13 @@ fun CondividiScreen(vm: StatoApp, ids: List<Int>, onIndietro: () -> Unit) {
             onDismissRequest = { daRevocare = null },
             containerColor = Colori.Superficie,
             shape = Forma22,
-            title = { Text("Revocare «${l.label}»?", style = Testo.Titolo22) },
-            text = { Text("Chi ha il link non potrà più aprirlo. Le timbrature non cambiano.", style = Testo.Corpo14.copy(color = Colori.Testo3)) },
+            title = { Text("Revocare il link?", style = Testo.Titolo22) },
+            text = {
+                Text(
+                    "${giornateLink(l)}, ${l.label}. Chi ha il link non potrà più aprirlo. Le timbrature non cambiano.",
+                    style = Testo.Corpo14.copy(color = Colori.Testo3),
+                )
+            },
             confirmButton = {
                 TextButton(onClick = {
                     daRevocare = null
@@ -1360,9 +1367,10 @@ fun CondividiScreen(vm: StatoApp, ids: List<Int>, onIndietro: () -> Unit) {
             onDismissRequest = { accessiDi = null },
             containerColor = Colori.Superficie,
             shape = Forma22,
-            title = { Text("Aperture di «${l.label}»", style = Testo.Titolo22) },
+            title = { Text("Aperture del link", style = Testo.Titolo22) },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("${giornateLink(l)} · ${l.label}", style = Testo.Piccolo12)
                     if (accessi.isEmpty()) Text("Nessuno l'ha ancora aperto.", style = Testo.Corpo14.copy(color = Colori.Testo3))
                     accessi.asReversed().forEach { a ->
                         val quando = oraDi(a.at)
@@ -1395,9 +1403,26 @@ fun CondividiScreen(vm: StatoApp, ids: List<Int>, onIndietro: () -> Unit) {
     }
 }
 
+/**
+ * Le giornate di un link, il modo in cui lo si riconosce: «Giovedì 5 novembre», «4 novembre e 5 novembre», «Dal 3
+ * novembre al 7 novembre · 5 giornate». Con un server che non le manda (vecchio): la data di creazione.
+ */
+internal fun giornateLink(l: LinkCondivisione, oggi: LocalDate = LocalDate.now()): String {
+    val giorni = l.days.mapNotNull { runCatching { LocalDate.parse(it) }.getOrNull() }.distinct().sorted()
+    fun giorno(d: LocalDate) = if (d.year == oggi.year) d.senzaAnno() else d.esteso()
+    return when (giorni.size) {
+        0 -> oraDi(l.creatoIl)?.toLocalDate()?.let { "Link del ${it.breve()}" } ?: "Link"
+        1 -> giorno(giorni[0])
+        2 -> "${giorni[0].giornoMeseParole()} e ${giorni[1].giornoMeseParole()}".replaceFirstChar { it.titlecase() }
+        else -> "Dal ${giorni.first().giornoMeseParole()} al ${giorni.last().giornoMeseParole()} · ${giorni.size} giornate"
+    }
+}
+
+/** Una riga dell'elenco: in grande le giornate, sotto in piccolo il destinatario (l'etichetta) e i dettagli. */
 @Composable
 private fun RigaLink(l: LinkCondivisione, onAccessi: () -> Unit, onRevoca: () -> Unit) {
     val scade = oraDi(l.scade)?.toLocalDate()
+    val creato = oraDi(l.creatoIl)?.toLocalDate()
     Row(
         Modifier.fillMaxWidth().clip(Forma22).background(Colori.Superficie, Forma22).clickable(role = Role.Button, onClick = onAccessi)
             .padding(horizontal = 16.dp, vertical = 12.dp),
@@ -1405,9 +1430,10 @@ private fun RigaLink(l: LinkCondivisione, onAccessi: () -> Unit, onRevoca: () ->
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(l.label, style = Testo.Corpo15.copy(fontWeight = FontWeight.ExtraBold))
+            Text(giornateLink(l), style = Testo.Corpo15.copy(fontWeight = FontWeight.ExtraBold))
+            Text(l.label, style = Testo.Piccolo12.copy(color = Colori.Testo2), maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                "${l.punchIds.size} ${if (l.punchIds.size == 1) "timbratura" else "timbrature"} · scade ${scade?.giornoMese() ?: "?"} · " +
+                "creato ${creato?.giornoMese() ?: "?"} · scade ${scade?.giornoMese() ?: "?"} · " +
                     "aperto ${l.accesses} ${if (l.accesses == 1) "volta" else "volte"}" + if (l.download) "" else " · senza download",
                 style = Testo.Piccolo12,
             )

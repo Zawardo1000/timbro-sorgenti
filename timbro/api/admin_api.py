@@ -187,11 +187,22 @@ class ShareIn(BaseModel):
     allow_evidence_download: bool = True
 
 
-def _share_summary(sh: ShareLink, accesses: int) -> dict:
+def _share_days(s, shares: list[ShareLink]) -> dict[int, list[str]]:
+    """Giornate (ora italiana, ora della timbratura) di ogni link: nell'app un link si riconosce dal giorno."""
+    ids = {pid for sh in shares for pid in json.loads(sh.punch_ids_json)}
+    day_of = {
+        p.id: services.punch_time(p).astimezone(services.LOCAL_TZ).date().isoformat()
+        for p in (s.scalars(select(Punch).where(Punch.id.in_(ids))) if ids else [])
+    }
+    return {sh.id: sorted({day_of[i] for i in json.loads(sh.punch_ids_json) if i in day_of}) for sh in shares}
+
+
+def _share_summary(sh: ShareLink, accesses: int, days: list[str]) -> dict:
     return {
         "id": sh.id,
         "label": sh.label,
         "punch_ids": json.loads(sh.punch_ids_json),
+        "days": days,
         "allow_evidence_download": sh.allow_evidence_download,
         "created_at": sh.created_at.isoformat(),
         "expires_at": sh.expires_at.isoformat(),
@@ -213,7 +224,7 @@ def create_share(body: ShareIn, request: Request, device: AdminDep):
         except ValueError as e:
             raise HTTPException(422, str(e)) from e
         # il token in chiaro esiste solo in questa risposta: nel DB c'è solo il suo hash
-        return {**_share_summary(sh, 0), "url": services.share_url(settings, token)}
+        return {**_share_summary(sh, 0, _share_days(s, [sh])[sh.id]), "url": services.share_url(settings, token)}
 
 
 @router.get("/shares")
@@ -223,7 +234,8 @@ def list_shares(request: Request, device: AdminDep):
         rows = s.scalars(
             select(ShareLink).where(ShareLink.user_id == device.user_id).order_by(ShareLink.id.desc())
         ).all()
-        return [_share_summary(sh, counts.get(sh.id, 0)) for sh in rows]
+        days = _share_days(s, rows)
+        return [_share_summary(sh, counts.get(sh.id, 0), days[sh.id]) for sh in rows]
 
 
 def _own_share(s, device, share_id: int) -> ShareLink:
@@ -241,7 +253,7 @@ def revoke_share(share_id: int, request: Request, device: AdminDep):
             sh.revoked_at = utcnow()
             s.commit()
         n = s.scalar(select(func.count()).select_from(ShareAccess).where(ShareAccess.share_id == sh.id))
-        return _share_summary(sh, n)
+        return _share_summary(sh, n, _share_days(s, [sh])[sh.id])
 
 
 @router.get("/shares/{share_id}/accesses")
@@ -324,7 +336,7 @@ def _contest(request: Request, device, body: ContestIn, punch_id: int | None, da
             "day": (day or services.punch_time(p).astimezone(services.LOCAL_TZ).date()).isoformat(),
             "punch": _punch_summary(s.get(Punch, punch_id)) if punch_id is not None else None,
             # il token in chiaro esiste solo in questa risposta (e nella mail)
-            "share": {**_share_summary(share, 0), "url": services.share_url(settings, token)},
+            "share": {**_share_summary(share, 0, _share_days(s, [share])[share.id]), "url": services.share_url(settings, token)},
             "notice": services.notice_summary(notice) if notice else None,
             "hours": services.hours_summary(hours, schedule),
         }

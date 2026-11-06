@@ -124,6 +124,7 @@ class ContrattoTest {
         assertEquals(listOf(121L, 122L, 123L, 124L), esito.share.punchIds)
         assertTrue(esito.share.download && esito.share.active)
         assertTrue(esito.share.url!!.contains("/s/"))
+        assertEquals(listOf("2026-11-04"), esito.share.days)
         val avviso = esito.notice!!
         assertEquals(StatoAvviso.IN_INVIO, avviso.stato)
         assertEquals(esito.share.id, avviso.shareId)

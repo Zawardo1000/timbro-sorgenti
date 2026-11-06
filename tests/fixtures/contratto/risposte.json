@@ -130,7 +130,10 @@
       "revoked_at": null,
       "active": true,
       "accesses": 0,
-      "url": "https://timbro.example.it/s/AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcd"
+      "url": "https://timbro.example.it/s/AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcd",
+      "days": [
+        "2026-11-04"
+      ]
     },
     "notice": {
       "id": 7,
