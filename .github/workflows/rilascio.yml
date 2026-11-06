@@ -166,7 +166,7 @@ jobs:
           (cd rilascio && sha256sum * > SHA256SUMS)
           repo="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
           {
-            echo "Sorgenti di Timbro al commit \`$COMMIT\` del repository di sviluppo (numero $NUMERO, $DATA)."
+            echo "Sorgenti di Timbro (server e app) al commit \`$COMMIT\` del repository di sviluppo ($DATA)."
             echo
             if [ "$APP" = 1 ]; then
               echo "**App 0.1.$NUMERO**: costruita da questo flusso dai sorgenti del tag e caricata nel test interno di"
@@ -182,7 +182,8 @@ jobs:
             echo "- provenienza: \`gh attestation verify timbro-$SHORT-sorgenti.tar.gz --repo $GITHUB_REPOSITORY\`"
             echo "- flusso e log di questa costruzione: $repo/actions/runs/$GITHUB_RUN_ID"
           } > "$RUNNER_TEMP/note.md"
-          gh release create "$TAG" rilascio/* --verify-tag --title "Timbro 0.1.$NUMERO ($SHORT)" --notes-file "$RUNNER_TEMP/note.md"
+          # titolo con il solo commit: la release è di tutto il codice (server e app), non solo dell'app
+          gh release create "$TAG" rilascio/* --verify-tag --title "Timbro $SHORT" --notes-file "$RUNNER_TEMP/note.md"
 
       - name: Caricamento su Google Play (test interno)
         if: steps.v.outputs.app == '1'
