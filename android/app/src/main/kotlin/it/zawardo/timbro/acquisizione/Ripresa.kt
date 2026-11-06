@@ -45,6 +45,8 @@ data class Ripresa(
     val posizione: Posizione?,
     val wifi: Wifi?,
     val orologi: Orologi? = null,
+    /** Codifica usata ("CameraX", "c2.mtk.avc.encoder · CBR"): solo da mostrare, non entra nel manifest. */
+    val codifica: String? = null,
 ) {
     fun cancella() {
         File(percorso).delete()
@@ -98,6 +100,9 @@ interface Registratore {
     /** La schermata se ne va: si liberano le risorse proprie (il codificatore della codifica compatta). */
     fun chiudi() {}
 
+    /** La codifica usata nell'ultima ripresa, per la schermata dopo lo stop. */
+    val descrizione: String
+
     companion object {
         const val DURATA_MASSIMA_MS = 15_000L
 
@@ -141,6 +146,7 @@ internal fun recorderDiSempre(): Recorder = Recorder.Builder()
  * alza il bitrate: sul POCO X6 Pro ~3 Mbit/s qualunque obiettivo (vedi [RegistratoreCompatto]).
  */
 class RegistratoreCameraX(private val contesto: Context) : Registratore {
+    override val descrizione = "CameraX"
     private var cattura: VideoCapture<Recorder>? = null
     private var registrazione: Recording? = null
 

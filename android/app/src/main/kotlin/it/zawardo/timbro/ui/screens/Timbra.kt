@@ -552,7 +552,12 @@ fun RegistrazioneScreen(tipo: Tipo, onRegistrata: (Ripresa) -> Unit, onAnnulla: 
                                 val (posizione, wifi) = s.concludi()
                                 val orologi = LetturaOrologi.leggi(contesto, inizioMonotono)
                                 consegnata.value = true
-                                onRegistrata(Ripresa(f.absolutePath, sha, f.length(), durataMs(f, millis), inizio, posizione, wifi, orologi))
+                                onRegistrata(
+                                    Ripresa(
+                                        f.absolutePath, sha, f.length(), durataMs(f, millis), inizio, posizione, wifi, orologi,
+                                        codifica = registratore.descrizione,
+                                    ),
+                                )
                             }
                         } else {
                             f?.delete()
@@ -745,6 +750,7 @@ fun ConfermaScreen(
             val sicuro = livello != "software" && livello != "?"
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Pastiglia("${(ripresa.durataMs + 500) / 1000} s · $mb MB · $mbit Mbit/s", fondo = Colori.Rilievo, colore = Colori.Inchiostro)
+                ripresa.codifica?.let { Pastiglia(it, fondo = Colori.Rilievo, colore = Colori.Inchiostro) }
                 when {
                     p == null -> Pastiglia("Posizione non disponibile", fondo = Colori.Giallo, colore = Colori.SuColore)
                     p.isMock == true -> Pastiglia("Posizione simulata!", fondo = Colori.Giallo, colore = Colori.SuColore)

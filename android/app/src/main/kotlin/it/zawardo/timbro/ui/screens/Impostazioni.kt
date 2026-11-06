@@ -2,6 +2,7 @@ package it.zawardo.timbro.ui.screens
 
 import androidx.compose.ui.platform.LocalContext
 import it.zawardo.timbro.acquisizione.PreferenzaVideo
+import it.zawardo.timbro.acquisizione.RegistratoreCompatto
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -141,6 +142,8 @@ fun ImpostazioniScreen(
                     "legge bene, spegnilo: si torna alla codifica di sempre.",
                 compatto, { compatto = it; PreferenzaVideo.impostaCompatto(contesto, it) },
             )
+            val scelta = remember { RegistratoreCompatto.descriviScelta() }
+            Text("Codificatore: $scelta", style = Testo.Piccolo12, modifier = Modifier.padding(bottom = 6.dp))
             if (vm.io?.admin == true) {
                 // per provare: vedere l'app come la vede un utente senza il ruolo di amministratore
                 RigaSpunta(

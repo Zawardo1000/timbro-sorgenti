@@ -76,22 +76,60 @@ class RegistratoreCompatto(private val contesto: Context) : Registratore {
 
         private const val MIME = MediaFormat.MIMETYPE_VIDEO_AVC
 
-        internal fun formato(larghezza: Int, altezza: Int): MediaFormat =
+        internal fun formato(
+            larghezza: Int,
+            altezza: Int,
+            modo: Int = MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR,
+        ): MediaFormat =
             MediaFormat.createVideoFormat(MIME, larghezza, altezza).apply {
                 setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
                 setInteger(MediaFormat.KEY_BIT_RATE, BITRATE_COMPATTO)
-                setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR)
+                setInteger(MediaFormat.KEY_BITRATE_MODE, modo)
                 setInteger(MediaFormat.KEY_FRAME_RATE, FOTOGRAMMI_AL_SECONDO)
                 setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, SECONDI_TRA_CHIAVI)
             }
 
-        /** Il codificatore H.264 che accetta il formato (CBR compreso), o null. */
-        internal fun codificatore(formato: MediaFormat): String? =
+        /** Il codificatore H.264 che dichiara di accettare il formato (CBR compreso), o null. */
+        private fun dichiaraCbr(formato: MediaFormat): String? =
             runCatching { MediaCodecList(MediaCodecList.REGULAR_CODECS).findEncoderForFormat(formato) }.getOrNull()
 
-        /** C'è un codificatore H.264 a bitrate costante per il 720p? Senza, si resta su CameraX. */
-        fun supportato(): Boolean = codificatore(formato(1280, 720)) != null
+        /**
+         * Il codificatore per quella risoluzione: prima uno che dichiara il CBR; altrimenti il primo hardware, a cui il
+         * CBR si chiede lo stesso. Sul POCO X6 Pro (06/11/2026) il MediaTek `c2.mtk.avc.encoder` dichiara solo il VBR, e il
+         * codificatore software di Android, che dichiara il CBR, Xiaomi lo limita a circa 720x480.
+         */
+        internal fun scegli(larghezza: Int, altezza: Int): Scelta? {
+            val avc = runCatching {
+                MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.filter { info ->
+                    info.isEncoder && !info.isAlias && !info.name.endsWith(".secure") &&
+                        info.supportedTypes.any { it.equals(MIME, ignoreCase = true) }
+                }
+            }.getOrDefault(emptyList())
+            dichiaraCbr(formato(larghezza, altezza))?.let { nome ->
+                return Scelta(nome, hardware = avc.firstOrNull { it.name == nome }?.isHardwareAccelerated == true, cbrDichiarato = true)
+            }
+            val hw = avc.firstOrNull { info ->
+                info.isHardwareAccelerated && !info.isSoftwareOnly &&
+                    runCatching { info.getCapabilitiesForType(MIME).videoCapabilities?.isSizeSupported(larghezza, altezza) == true }.getOrDefault(false)
+            } ?: return null
+            return Scelta(hw.name, hardware = true, cbrDichiarato = false)
+        }
+
+        /** C'è un codificatore H.264 per il 720p da usare così? Senza, si resta su CameraX. */
+        fun supportato(): Boolean = scegli(1280, 720) != null
+
+        /** Per le impostazioni: quale codificatore userebbe la codifica compatta e se dichiara il CBR. */
+        fun descriviScelta(): String = scegli(1280, 720)?.let {
+            "${it.nome} (${if (it.hardware) "hardware" else "software"}): " +
+                if (it.cbrDichiarato) "CBR dichiarato" else "CBR non dichiarato, si chiede lo stesso"
+        } ?: "nessun codificatore adatto: resta la codifica di sempre"
     }
+
+    /** Il codificatore scelto da [scegli]. */
+    internal data class Scelta(val nome: String, val hardware: Boolean, val cbrDichiarato: Boolean)
+
+    /** Codificatore e modalità usati davvero nell'ultima ripresa, per la schermata dopo lo stop. */
+    override val descrizione: String get() = codificatore.descrizione ?: "compatta"
 }
 
 /**
@@ -119,6 +157,10 @@ private class Codificatore {
     private var ultimoAvviso = -1L
     private var scritti = 0
 
+    /** Codificatore e modalità in uso ("c2.mtk.avc.encoder · CBR"), letto dal thread principale. */
+    @Volatile var descrizione: String? = null
+        private set
+
     fun superficie(request: SurfaceRequest) {
         gestore.post { prepara(request) }
     }
@@ -145,22 +187,49 @@ private class Codificatore {
     private fun prepara(request: SurfaceRequest) {
         rilascia(codec, superficie) // una superficie nuova sostituisce la vecchia
         val dim = request.resolution
-        val formato = RegistratoreCompatto.formato(dim.width, dim.height)
-        val nome = RegistratoreCompatto.codificatore(formato)
-        if (nome == null) {
+        val scelta = RegistratoreCompatto.scegli(dim.width, dim.height)
+        if (scelta == null) {
             request.willNotProvideSurface()
-            concludi("nessun codificatore H.264 a bitrate costante per ${dim.width}x${dim.height}")
+            concludi("nessun codificatore H.264 per ${dim.width}x${dim.height}")
             return
         }
-        val c = MediaCodec.createByCodecName(nome)
+        // CBR; se il codificatore lo rifiuta, VBR (resta il fotogramma chiave ogni 5 s)
+        val prove = listOf(
+            MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR to "CBR",
+            MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR to "VBR (CBR rifiutato)",
+        )
+        var c: MediaCodec? = null
+        var modo = ""
+        for ((valore, nomeModo) in prove) {
+            val prova = MediaCodec.createByCodecName(scelta.nome)
+            try {
+                prova.setCallback(Richiami(), gestore)
+                prova.configure(RegistratoreCompatto.formato(dim.width, dim.height, valore), null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+                c = prova
+                modo = nomeModo
+                break
+            } catch (e: Exception) {
+                Log.w(TAG, "${scelta.nome}: $nomeModo non accettato", e)
+                runCatching { prova.release() }
+            }
+        }
+        if (c == null) {
+            request.willNotProvideSurface()
+            concludi("il codificatore ${scelta.nome} non accetta il formato")
+            return
+        }
         try {
-            c.setCallback(Richiami(), gestore)
-            c.configure(formato, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
             val s = c.createInputSurface()
             c.start()
             codec = c
             superficie = s
-            Log.i(TAG, "$nome ${dim.width}x${dim.height} CBR ${RegistratoreCompatto.BITRATE_COMPATTO} bit/s")
+            descrizione = "${scelta.nome} · $modo"
+            Log.i(
+                TAG,
+                "${scelta.nome} ${dim.width}x${dim.height} $modo ${RegistratoreCompatto.BITRATE_COMPATTO} bit/s, " +
+                    "chiave ogni ${RegistratoreCompatto.SECONDI_TRA_CHIAVI} s (CBR dichiarato: ${scelta.cbrDichiarato}); " +
+                    "formato in uscita: ${runCatching { c.outputFormat }.getOrNull()}",
+            )
             request.setTransformationInfoListener(qui) { info -> rotazione = info.rotationDegrees }
             // la fotocamera ha finito con la superficie (schermata chiusa, nuovo collegamento): si libera tutto
             request.provideSurface(s, qui) { rilascia(c, s) }

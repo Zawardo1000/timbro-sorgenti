@@ -239,7 +239,10 @@ def test_pacchetto_completo_verificato_dallo_script(app, phone, tmp_path):
     data = tsr.read_bytes()
     tsr.write_bytes(data[:-1] + bytes([data[-1] ^ 1]))
     sig = tmp_path / "manifest.sig"
-    sig.write_bytes(sig.read_bytes()[:-1] + b"\x00")
+    # un bit invertito, non un byte a zero: la firma ECDSA cambia a ogni esecuzione e una volta su 256 finisce già con
+    # 0x00, e allora "alterarla" così non cambiava niente (CI del 06/11/2026)
+    firma = sig.read_bytes()
+    sig.write_bytes(firma[:-1] + bytes([firma[-1] ^ 1]))
     out = subprocess.run([sys.executable, "verifica.py", ".", "--offline"], cwd=tmp_path, capture_output=True, text=True)
     assert out.returncode == 1
     assert "ERR  marca video · accv" in out.stdout and "ERR  manifest.json firmato dalla chiave del telefono" in out.stdout
