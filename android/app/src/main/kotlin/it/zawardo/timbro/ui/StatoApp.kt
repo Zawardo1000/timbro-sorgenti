@@ -238,6 +238,24 @@ class StatoApp(app: Application) : AndroidViewModel(app) {
     fun caricato(data: LocalDate): Boolean =
         dimostrazione || caricatoDal?.let { !data.isBefore(it) } == true || finestre.any { it.contiene(data) }
 
+    /**
+     * Timbrature della coda già accettate dal server prima della lettura, di giorni che la lettura copre, che il server
+     * non restituisce più: le ha cancellate (azzeramento dei dati di prova, 06/11/2026). Senza questo la coda le teneva
+     * per sempre e lo storico le mostrava come "non ancora restituite". Si tolgono dalla coda, con il video se c'è
+     * ancora. Il primo giorno della finestra resta fuori: il server raggruppa per l'ora della timbratura, la coda per
+     * l'ora del telefono, e al bordo potrebbero non coincidere.
+     */
+    private suspend fun dimenticaCancellate(f: Ricerca.Finestra, accettatePrima: Set<String>, restituite: Set<String>) {
+        val codaDao = timbro.coda.coda()
+        val sparite = codaDao.tutte().filter {
+            it.serverId != null && it.clientId in accettatePrima && it.clientId !in restituite &&
+                it.giorno() > f.dal && it.giorno() <= f.fino
+        }
+        if (sparite.isEmpty()) return
+        sparite.forEach { File(it.percorsoVideo).delete() }
+        codaDao.elimina(sparite.map { it.id })
+    }
+
     private fun segnaContinuo(dal: LocalDate, prossimo: String?) {
         caricatoDal = dal
         altriPrima = prossimo?.let(LocalDate::parse)
@@ -249,12 +267,15 @@ class StatoApp(app: Application) : AndroidViewModel(app) {
 
     private fun carica(f: Ricerca.Finestra, poi: (it.zawardo.timbro.core.api.Storico) -> Unit) {
         caricamento = true
+        // accettate dal server prima di questa lettura: se il server non le restituisce, le ha cancellate
+        val accettatePrima = coda.filter { it.serverId != null }.mapTo(HashSet()) { it.clientId }
         viewModelScope.launch {
             val esito = tenta {
                 val s = api.storico(f.fino, f.giorni)
                 val voci = s.days.flatMap { g -> g.punches.map { it.perCache(g.giorno) } }
                 dao.sostituisci(f.dal.toString(), f.fino.toString(), voci)
                 cache = dao.tutte()
+                dimenticaCancellate(f, accettatePrima, voci.mapTo(HashSet()) { it.clientId })
                 s
             }
             when (esito) {

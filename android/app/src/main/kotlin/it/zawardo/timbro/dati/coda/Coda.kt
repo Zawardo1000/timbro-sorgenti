@@ -164,6 +164,10 @@ interface CodaDao {
     @Query("SELECT COUNT(*) FROM coda WHERE stato IN ('DA_INVIARE', 'VIDEO_DA_INVIARE')")
     suspend fun inAttesa(): Int
 
+    /** Timbrature che il server non ha più (cancellate lì): la coda le dimentica (StatoApp.carica). */
+    @Query("DELETE FROM coda WHERE id IN (:ids)")
+    suspend fun elimina(ids: List<Long>)
+
     @Query("SELECT * FROM coda ORDER BY creata_il DESC")
     suspend fun tutte(): List<TimbraturaInCoda>
 
