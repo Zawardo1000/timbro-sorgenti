@@ -12,7 +12,7 @@
 @font-face { font-family: "JetBrains Mono"; src: url("/s/static/fonts/jetbrains_mono.woff2") format("woff2"); font-weight: 100 800; font-display: swap; }
 :root {
   --bg: #0D0D10; --card: #17171C; --rilievo: #24242C; --line: #2E2E38; --text: #FFFFFF; --muted: #A8A8B3;
-  --in: #3DFFB0; --out: #FF7A1A; --warn: #FFE14D; --keep: #8ED0FF; --bad: #FF6B6B;
+  --in: #3DFFB0; --out: #FF7A1A; --warn: #FFE14D; --keep: #8ED0FF; --bad: #FF6B6B; --fuori: #B79CFF;
   --title: "Unbounded", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, monospace;
 }
 * { box-sizing: border-box; }
@@ -44,6 +44,7 @@ header .who .v { font-size: 13px; color: var(--muted); margin-top: 8px; }
 .day-head .t { font-weight: 800; font-size: 17px; }
 .bar { position: relative; height: 12px; border-radius: 6px; background: var(--rilievo); margin: 16px 0 6px; }
 .bar span { position: absolute; top: 0; bottom: 0; border-radius: 6px; background: linear-gradient(90deg, var(--in), var(--out)); }
+.bar span.fuori { background: repeating-linear-gradient(135deg, var(--fuori) 0 5px, transparent 5px 9px); }
 .ticks { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-family: var(--mono); }
 .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; }
 .chip { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 12px; border-radius: 11px;
@@ -51,6 +52,7 @@ header .who .v { font-size: 13px; color: var(--muted); margin-top: 8px; }
 .chip.in { background: var(--in); } .chip.out { background: var(--out); }
 .chip.contested { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--warn); }
 .pause { font-size: 12px; font-weight: 700; color: var(--muted); }
+.pause.fuori { color: var(--fuori); }
 .hours { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
 .hours > div { display: flex; flex-direction: column; }
 .hours span { font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
@@ -139,12 +141,12 @@ video { max-height: 70vh; object-fit: contain; }
     <span class="day-num">{{ "%02d"|format(d.date.day) }}</span>
     <div><div class="t">{{ d.label[:1]|upper }}{{ d.label[1:] }}</div><div class="muted">{{ d.punches|length }} {{ "timbratura" if d.punches|length == 1 else "timbrature" }}</div></div>
   </div>
-  <div class="bar" aria-hidden="true">{% for s in d.bar %}<span style="left: {{ s.left }}%; width: {{ s.width }}%"></span>{% endfor %}</div>
+  <div class="bar" aria-hidden="true">{% for s in d.bar %}<span{% if s.fuori %} class="fuori"{% endif %} style="left: {{ s.left }}%; width: {{ s.width }}%"></span>{% endfor %}</div>
   <div class="ticks" aria-hidden="true"><span>7</span><span>10</span><span>13</span><span>16</span><span>19</span></div>
   <div class="chips">
     {% for p in d.punches %}
     <a class="chip {{ p.kind }}{% if p.contested %} contested{% endif %}" href="#p{{ p.id }}" aria-label="{{ p.label }} delle {{ hm(p.time) }}{% if p.contested %}, contestata{% endif %}">{{ "→" if p.kind == "in" else "←" }} {{ hm(p.time) }}</a>
-    {% if d.pauses.get(p.id) is not none %}<span class="pause">pausa {{ d.pauses[p.id] }}′</span>{% endif %}
+    {% set g = d.pauses.get(p.id) %}{% if g %}<span class="pause{% if g.label != 'pausa' %} fuori{% endif %}">{{ g.label }} {{ g.minutes }}′</span>{% endif %}
     {% endfor %}
   </div>
   {% if d.hours %}
@@ -176,6 +178,7 @@ video { max-height: 70vh; object-fit: contain; }
 {% for p in d.punches %}
 <article class="card punch" id="p{{ p.id }}">
   <h3><span class="dot {{ p.kind }}"></span>{{ p.label }} delle {{ p.time.strftime("%H:%M:%S") }}{% if p.contested %} <span class="badge warn">CONTESTATA</span>{% endif %}</h3>
+  {% if p.reason %}<p class="muted">Causale dichiarata nell'app da chi timbra: non fa parte della timbratura firmata e conta solo per il calcolo delle ore.</p>{% endif %}
   <div class="punch-body">
   <div class="media">
   {% if p.video_url %}

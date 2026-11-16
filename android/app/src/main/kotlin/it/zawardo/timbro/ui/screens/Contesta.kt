@@ -40,6 +40,7 @@ import it.zawardo.timbro.core.Ore
 import it.zawardo.timbro.core.api.Contestazioni
 import it.zawardo.timbro.core.api.StatoAvviso
 import it.zawardo.timbro.core.api.TestoMail
+import it.zawardo.timbro.core.api.VoceMail
 import it.zawardo.timbro.ui.ContestazioneInviata
 import it.zawardo.timbro.ui.StatoApp
 import it.zawardo.timbro.ui.LocalFirmatario
@@ -130,7 +131,7 @@ fun ContestaScreen(
         Scheda(bordo = Colori.Giallo, padding = PaddingValues(horizontal = 18.dp, vertical = 16.dp)) {
             Text(
                 if (t != null) {
-                    "Contesti ${TestoMail.timbratura(t.tipo.kind, t.quando.toLocalTime())} di ${giorno.senzaAnnoMinuscolo()}: " +
+                    "Contesti ${TestoMail.timbratura(t.tipo.kind, t.quando.toLocalTime(), t.causale)} di ${giorno.senzaAnnoMinuscolo()}: " +
                         "il link mostra tutta la giornata."
                 } else {
                     "Segnali tutta la giornata di ${giorno.senzaAnnoMinuscolo()}: il link mostra " +
@@ -199,11 +200,11 @@ fun ContestaScreen(
                     Text(TestoMail.oggetto(nome, matricola, giorno), style = Testo.Corpo14.copy(fontWeight = FontWeight.ExtraBold), modifier = Modifier.padding(top = 8.dp))
                     Text("Gentile ufficio,", style = Testo.Corpo14.copy(color = Colori.Testo3), modifier = Modifier.padding(top = 8.dp))
                     Text(
-                        TestoMail.primoParagrafo(nome, matricola, giorno, t?.let { it.tipo.kind to it.quando.toLocalTime() }),
+                        TestoMail.primoParagrafo(nome, matricola, giorno, t?.let { VoceMail(it.tipo.kind, it.quando.toLocalTime(), it.causale) }),
                         style = Testo.Corpo14.copy(color = Colori.Testo3), modifier = Modifier.padding(top = 6.dp),
                     )
                     Text(
-                        TestoMail.paragrafoGiornata(delGiorno.map { it.tipo.kind to it.quando.toLocalTime() }, oreMail) + " …",
+                        TestoMail.paragrafoGiornata(delGiorno.map { VoceMail(it.tipo.kind, it.quando.toLocalTime(), it.causale) }, oreMail) + " …",
                         style = Testo.Corpo14.copy(color = Colori.Testo3), modifier = Modifier.padding(top = 6.dp),
                     )
                     Text(

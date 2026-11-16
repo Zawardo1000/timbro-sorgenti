@@ -2,6 +2,7 @@ package it.zawardo.timbro.acquisizione
 
 import it.zawardo.timbro.BuildConfig
 import it.zawardo.timbro.TimbroApp
+import it.zawardo.timbro.core.Causale
 import it.zawardo.timbro.core.Manifest
 import it.zawardo.timbro.core.api.ApiJson
 import it.zawardo.timbro.dati.coda.Invio
@@ -21,10 +22,11 @@ import kotlinx.serialization.builtins.serializer
  * 3. attestazione hardware con challenge = SHA-256 di quei byte;
  * 4. tutto nella coda locale **prima** di qualunque rete: se il telefono è offline, o l'app si chiude, la timbratura
  *    resta e parte appena si può (InvioWorker).
+ * La causale (uscita di servizio, visita medica) viaggia accanto al manifest, non dentro: non è una prova.
  */
 class Timbratrice(private val app: TimbroApp) {
 
-    suspend fun timbra(r: Ripresa, kind: String): TimbraturaInCoda = withContext(Dispatchers.Default) {
+    suspend fun timbra(r: Ripresa, kind: String, causale: Causale?): TimbraturaInCoda = withContext(Dispatchers.Default) {
         val telefono = app.associazione.telefonoId ?: error("telefono non associato")
         val m = Manifest(
             clientId = UUID.randomUUID().toString(),
@@ -51,6 +53,7 @@ class Timbratrice(private val app: TimbroApp) {
             percorsoVideo = r.percorso,
             videoSha256 = r.sha256,
             creataIl = r.inizio.toInstant().toEpochMilli(),
+            causale = causale?.codice,
         )
         val dao = app.coda.coda()
         dao.aggiungi(voce)

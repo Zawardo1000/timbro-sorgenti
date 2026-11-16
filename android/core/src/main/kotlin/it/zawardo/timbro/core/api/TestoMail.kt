@@ -1,5 +1,6 @@
 package it.zawardo.timbro.core.api
 
+import it.zawardo.timbro.core.Causale
 import it.zawardo.timbro.core.EsitoOre
 import it.zawardo.timbro.core.Ore
 import java.time.LocalDate
@@ -10,13 +11,17 @@ import java.util.Locale
 /** Oggetto e corpo (testo semplice, a capo `\n`) della mail di contestazione. */
 data class Mail(val oggetto: String, val corpo: String)
 
+/** Una timbratura nel testo della mail: tipo, ora e causale (uscita di servizio, visita medica). */
+data class VoceMail(val kind: String, val ora: LocalTime, val causale: Causale? = null)
+
 /**
  * Testo standard della mail di contestazione: lo stesso dell'anteprima nell'app e della mail che manda il server
  * (`timbro/mailer.py`, `compose`). `tests/fixtures/contratto/mail.json` lo fissa carattere per carattere per tutti e
  * due (qui `TestoMailTest`). Neutro rispetto al genere ("<Nome>, matricola <N>, segnala").
  *
  * Due varianti: una timbratura contestata ("… in particolare per l'uscita delle 12:31.") o tutta la giornata (senza
- * quella frase). In entrambe l'elenco delle timbrature del giorno e, se c'è un orario, le ore valide con il saldo.
+ * quella frase). In entrambe l'elenco delle timbrature del giorno, con le causali ("uscita di servizio 10:00"), e, se
+ * c'è un orario, le ore valide con il saldo.
  */
 object TestoMail {
     private val IT = Locale.ITALIAN
@@ -27,21 +32,21 @@ object TestoMail {
     fun oggetto(nome: String, matricola: String, giorno: LocalDate): String =
         "Timbrature del ${giorno.format(DATA_BREVE)}: segnalazione di disallineamento - $nome, matricola $matricola"
 
-    /** "l'uscita delle 12:31", "l'entrata delle 07:58" */
-    fun timbratura(kind: String, ora: LocalTime): String =
-        (if (kind == "in") "l'entrata delle " else "l'uscita delle ") + ora.format(ORA)
+    /** "l'uscita delle 12:31", "l'entrata delle 07:58", "l'uscita di servizio delle 10:00" */
+    fun timbratura(kind: String, ora: LocalTime, causale: Causale? = null): String =
+        "l'${Causale.etichetta(kind, causale)} delle ${ora.format(ORA)}"
 
-    /** [contestata] = (tipo, ora) della timbratura contestata; null per tutta la giornata. */
-    fun primoParagrafo(nome: String, matricola: String, giorno: LocalDate, contestata: Pair<String, LocalTime>?): String {
+    /** [contestata] = la timbratura contestata; null per tutta la giornata. */
+    fun primoParagrafo(nome: String, matricola: String, giorno: LocalDate, contestata: VoceMail?): String {
         var testo = "$nome, matricola $matricola, segnala un disallineamento tra i dati di presenza registrati dall'ente " +
             "per ${giorno.format(GIORNO_ESTESO)} e quanto effettivamente avvenuto"
-        if (contestata != null) testo += ", in particolare per ${timbratura(contestata.first, contestata.second)}"
+        if (contestata != null) testo += ", in particolare per ${timbratura(contestata.kind, contestata.ora, contestata.causale)}"
         return "$testo."
     }
 
     /** "Le timbrature della giornata sono: entrata 07:58, uscita 12:31. Secondo l'articolazione oraria …" */
-    fun paragrafoGiornata(timbrature: List<Pair<String, LocalTime>>, ore: EsitoOre?): String {
-        val elenco = timbrature.joinToString(", ") { (k, t) -> "${if (k == "in") "entrata" else "uscita"} ${t.format(ORA)}" }
+    fun paragrafoGiornata(timbrature: List<VoceMail>, ore: EsitoOre?): String {
+        val elenco = timbrature.joinToString(", ") { "${Causale.etichetta(it.kind, it.causale)} ${it.ora.format(ORA)}" }
         var testo = "Le timbrature della giornata sono: $elenco."
         if (ore != null) {
             testo += " Secondo l'articolazione oraria in vigore risultano ${Ore.durata(ore.lavoratiMin)} di lavoro valido, " +
@@ -59,8 +64,8 @@ object TestoMail {
         nome: String,
         matricola: String,
         giorno: LocalDate,
-        contestata: Pair<String, LocalTime>?,
-        timbrature: List<Pair<String, LocalTime>>,
+        contestata: VoceMail?,
+        timbrature: List<VoceMail>,
         ore: EsitoOre?,
         url: String,
         scadenza: LocalDate,

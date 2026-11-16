@@ -19,7 +19,7 @@ def _at(day: str, hm: str) -> datetime:
 
 @pytest.mark.parametrize("case", DATA["cases"], ids=[c["name"] for c in DATA["cases"]])
 def test_casi_condivisi(case):
-    marks = [orario.Mark(k, _at(case["day"], hm)) for k, hm in case["marks"]]
+    marks = [orario.Mark(k, _at(case["day"], hm), *reason) for k, hm, *reason in case["marks"]]
     now = _at(case["day"], case["now"]) if case.get("now") else None
     r = orario.compute(marks, SCHEDULES.at(date.fromisoformat(case["day"])), now)
     got = {
@@ -51,7 +51,32 @@ def test_senza_orario_solo_ore_lorde():
     assert (r.worked_min, r.due_min, r.balance_min, r.adjustments) == (480, None, None, [])
 
 
+def test_senza_orario_il_tempo_fuori_conta_lo_stesso():
+    """La causale non è una regola dell'orario: senza orario il tempo fuori per servizio conta comunque."""
+    marks = [orario.Mark("in", _at("2026-11-04", "08:00")), orario.Mark("out", _at("2026-11-04", "10:00"), "service"),
+             orario.Mark("in", _at("2026-11-04", "11:00"), "service"), orario.Mark("out", _at("2026-11-04", "12:00"))]
+    r = orario.compute(marks, None)
+    assert (r.worked_min, r.due_min, r.complete) == (240, None, True)
+    assert [n.code for n in r.adjustments] == ["fuori_in_presenza"]
+    # senza causale le stesse timbrature valgono 3 ore
+    assert orario.compute([orario.Mark(m.kind, m.at) for m in marks], None).worked_min == 180
+
+
+def test_fuori_ieri_senza_rientro_non_conta_fino_a_adesso():
+    """now di un altro giorno non apre niente: la giornata passata conta fino all'uscita, da verificare."""
+    marks = [orario.Mark("in", _at("2026-11-04", "08:00")), orario.Mark("out", _at("2026-11-04", "10:00"), "service")]
+    r = orario.compute(marks, SCHEDULES.at(date(2026, 11, 4)), _at("2026-11-05", "09:00"))
+    assert (r.worked_min, r.open, r.complete) == (120, False, True)
+    assert [n.code for n in r.anomalies] == ["senza_rientro"]
+
+
 def test_testi():
     assert orario.duration(514) == "8 h 34" and orario.balance(34) == "+34′" and orario.balance(-90) == "−1 h 30"
     lines = orario.describe_schedule(SCHEDULES.versions[0])
     assert "venerdì 4 h 00 senza pausa" in lines[0] and "07:30" in lines[1]
+    assert "servizio" in lines[-1] and "visita medica" in lines[-1]
+    labels = [orario.punch_label(k, r) for r in (None, "service", "medical") for k in ("in", "out")]
+    assert labels == ["entrata", "uscita", "entrata di servizio", "uscita di servizio", "entrata da visita medica",
+                      "uscita per visita medica"]
+    assert orario.describe(orario.Note("fuori_in_presenza", {"ora": "10:00", "durata": 60, "causale": "medical"})) == (
+        "fuori per visita medica dalle 10:00: 60′ contati come presenza")

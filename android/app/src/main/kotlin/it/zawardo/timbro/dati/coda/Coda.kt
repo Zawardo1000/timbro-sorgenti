@@ -56,6 +56,11 @@ data class TimbraturaInCoda(
     /** Prova OpenTimestamps del video confermata su Bitcoin. */
     @ColumnInfo(name = "bitcoin", defaultValue = "0") val bitcoin: Boolean = false,
     @ColumnInfo(name = "stato_letto_il", defaultValue = "0") val statoLettoIl: Long = 0,
+    /**
+     * Causale ("service", "medical"), mandata con il manifest ma fuori dai byte firmati: il server la tiene accanto
+     * alle note e dopo si cambia dallo Storico (lì vale quella del server).
+     */
+    @ColumnInfo(name = "reason") val causale: String? = null,
 ) {
     // ByteArray: equals/hashCode per contenuto (Room confronta le righe solo per chiave, ma le data class li usano)
     override fun equals(other: Any?) = other is TimbraturaInCoda && other.id == id && other.clientId == clientId &&
@@ -89,6 +94,8 @@ data class VoceInCache(
     @ColumnInfo(name = "attestazione_ok") val attestazioneOk: Boolean?,
     val contestata: Boolean,
     @ColumnInfo(name = "da_tenere") val daTenere: Boolean,
+    /** Causale ("service", "medical") o null. */
+    @ColumnInfo(name = "reason") val causale: String? = null,
 )
 
 @Dao
@@ -178,10 +185,11 @@ interface CodaDao {
 
 @Database(
     entities = [TimbraturaInCoda::class, VoceInCache::class],
-    version = 3,
+    version = 4,
     exportSchema = true,
-    // 2: stato delle prove letto dal server (colonne aggiunte, con valori predefiniti); 3: cache dello storico
-    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3)],
+    // 2: stato delle prove letto dal server (colonne aggiunte, con valori predefiniti); 3: cache dello storico;
+    // 4: causale (uscita di servizio, visita medica) nella coda e nella cache
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4)],
 )
 @TypeConverters(Convertitori::class)
 abstract class CodaDb : RoomDatabase() {

@@ -1,6 +1,7 @@
 package it.zawardo.timbro.ui
 
 import androidx.compose.ui.graphics.Color
+import it.zawardo.timbro.core.Causale
 import it.zawardo.timbro.core.Segno
 import it.zawardo.timbro.core.api.StatoAvviso
 import it.zawardo.timbro.ui.theme.Colori
@@ -67,8 +68,13 @@ data class Timbratura(
     val clientId: String? = null,
     /** Ricezione sul server (ISO 8601 con fuso), dallo storico. */
     val ricevutaIl: String? = null,
+    /** Uscita di servizio o per visita medica (e il rientro): sul server accanto alle note, non nel manifest firmato. */
+    override val causale: Causale? = null,
 ) : Segno {
     override val kind: String get() = tipo.kind
+
+    /** "Entrata", "Uscita di servizio", "Entrata da visita medica", … */
+    val etichetta: String get() = causale?.etichetta(kind)?.replaceFirstChar { it.uppercase() } ?: tipo.etichetta
 
     /** Sul server: si può gestire (flag, link, contestazioni). */
     val sulServer: Boolean get() = id > 0

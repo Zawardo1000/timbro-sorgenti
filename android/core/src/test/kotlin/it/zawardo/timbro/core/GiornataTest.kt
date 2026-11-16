@@ -10,12 +10,12 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 
 class GiornataTest {
-    private data class T(override val kind: String, override val quando: LocalDateTime) : Segno
+    private data class T(override val kind: String, override val quando: LocalDateTime, override val causale: Causale? = null) : Segno
 
     private val giorno = LocalDate.of(2026, 11, 4) // mercoledì
     private fun at(h: Int, m: Int, d: LocalDate = giorno) = d.atTime(h, m)
-    private fun e(h: Int, m: Int, d: LocalDate = giorno) = T("in", at(h, m, d))
-    private fun u(h: Int, m: Int, d: LocalDate = giorno) = T("out", at(h, m, d))
+    private fun e(h: Int, m: Int, d: LocalDate = giorno, c: Causale? = null) = T("in", at(h, m, d), c)
+    private fun u(h: Int, m: Int, d: LocalDate = giorno, c: Causale? = null) = T("out", at(h, m, d), c)
 
     private val piena = listOf(e(8, 1), u(12, 30), e(12, 58), u(17, 2))
 
@@ -102,5 +102,54 @@ class GiornataTest {
         assertTrue(Sveglia.predefinita(0))
         assertFalse(Sveglia.predefinita(1))
         assertEquals(at(12, 46), Sveglia.alle(at(12, 31)))
+    }
+
+    @Test
+    fun `l'uscita di servizio non e' la pausa ne' la fine della giornata`() {
+        val servizio = u(10, 0, c = Causale.SERVIZIO)
+        val fuori = Giornata(giorno, listOf(e(8, 0), servizio))
+        assertEquals(Causale.SERVIZIO, fuori.fuori)
+        assertFalse(fuori.inPausa)
+        assertEquals(0, fuori.uscite)  // la sveglia della pausa resta quella della prima uscita normale
+        assertEquals(Duration.ofMinutes(120 + 45), fuori.lavorato(at(10, 45)))  // il tempo fuori conta fino ad adesso
+        assertEquals(Duration.ofMinutes(120), fuori.lavorato(at(9, 0, giorno.plusDays(1))))  // un altro giorno no
+
+        val segni = listOf(e(8, 0), servizio, e(11, 0, c = Causale.SERVIZIO), u(12, 30))
+        val inPausa = Giornata(giorno, segni)
+        assertNull(inPausa.fuori)
+        assertTrue(inPausa.inPausa)  // la 12:30 è la prima uscita che conta
+        assertEquals(1, inPausa.uscite)
+        val piena = Giornata(giorno, segni + listOf(e(13, 0), u(16, 30)))
+        assertEquals(Duration.ofMinutes(30), piena.pausa)  // non i 60 minuti di servizio
+        assertEquals(listOf(Causale.SERVIZIO, null), piena.intervalli.map { it.causale })
+        assertEquals(Duration.ofMinutes(120 + 60 + 90 + 210), piena.lavorato())
+        assertFalse(piena.inPausa)
+        assertEquals(2, piena.uscite)
+    }
+
+    @Test
+    fun `basta la causale su una delle due timbrature`() {
+        val g = Giornata(giorno, listOf(e(8, 0), u(10, 0), e(10, 30, c = Causale.VISITA), u(12, 0)))
+        assertEquals(Causale.VISITA, g.intervalli.single().causale)
+        assertNull(g.pausa)
+        assertEquals(causaleFuori(u(10, 0, c = Causale.SERVIZIO), e(11, 0)), Causale.SERVIZIO)
+        assertNull(causaleFuori(u(10, 0), e(11, 0)))
+    }
+
+    @Test
+    fun `rientro da servizio o da visita senza conferma della pausa minima`() {
+        assertNull(PausaMinima.daConfermare("in", u(12, 31, c = Causale.SERVIZIO), at(12, 35)))
+        assertNull(PausaMinima.daConfermare("in", u(12, 31, c = Causale.VISITA), at(12, 35)))
+    }
+
+    @Test
+    fun `etichette con la causale, come il backend`() {
+        assertEquals(
+            listOf("entrata", "uscita", "entrata di servizio", "uscita di servizio", "entrata da visita medica", "uscita per visita medica"),
+            listOf(null, Causale.SERVIZIO, Causale.VISITA).flatMap { c -> listOf("in", "out").map { Causale.etichetta(it, c) } },
+        )
+        assertEquals(Causale.VISITA, Causale.da("medical"))
+        assertNull(Causale.da("ferie"))
+        assertNull(Causale.da(null))
     }
 }

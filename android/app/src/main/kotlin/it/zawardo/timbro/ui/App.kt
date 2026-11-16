@@ -44,6 +44,7 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
+import it.zawardo.timbro.core.Causale
 import it.zawardo.timbro.core.Sveglia
 import it.zawardo.timbro.dati.FirmatarioAdmin
 import it.zawardo.timbro.sicurezza.FirmaBiometrica
@@ -73,14 +74,14 @@ import java.time.LocalDate
 /**
  * Le schermate dell'app e come ci si muove fra loro.
  *
- * Il tipo (entrata/uscita) e la sveglia del rientro si fissano al tocco di Registra e viaggiano nelle rotte: la
- * proposta che si ricalcola dopo (a mezzanotte, o dopo la conferma) non cambia la timbratura in corso. La sveglia
- * si programma solo alla conferma dell'uscita e si cancella al rientro.
+ * Il tipo (entrata/uscita), la sveglia del rientro e la causale (servizio, visita medica; "-" nessuna) si fissano al
+ * tocco di Registra e viaggiano nelle rotte: la proposta che si ricalcola dopo (a mezzanotte, o dopo la conferma) non
+ * cambia la timbratura in corso. La sveglia si programma solo alla conferma dell'uscita e si cancella al rientro.
  */
 private object Rotte {
     const val TIMBRA = "timbra"
-    const val REGISTRA = "registra/{kind}/{sveglia}"
-    const val CONFERMA = "conferma/{kind}/{sveglia}"  // la ripresa sta nel ViewModel (file, impronta, sensori)
+    const val REGISTRA = "registra/{kind}/{sveglia}/{causale}"
+    const val CONFERMA = "conferma/{kind}/{sveglia}/{causale}"  // la ripresa sta nel ViewModel (file, impronta, sensori)
     const val STORICO = "storico"
     const val DETTAGLIO = "dettaglio/{id}"
     const val CONDIVIDI = "condividi/{ids}"
@@ -159,6 +160,9 @@ fun App(vm: StatoApp, collegamento: Collegamento, firmatario: FirmatarioAdmin) {
     // scelte a mano; senza, valgono la proposta automatica e la sveglia predefinita. Dopo ogni timbratura si riparte
     var scelta by rememberSaveable { mutableStateOf<Tipo?>(null) }
     var svegliaScelta by rememberSaveable { mutableStateOf<Boolean?>(null) }
+    // causale toccata a mano (anche "nessuna"): senza, vale quella proposta (al rientro la stessa dell'uscita)
+    var causaleScelta by rememberSaveable { mutableStateOf<Causale?>(null) }
+    var causaleToccata by rememberSaveable { mutableStateOf(false) }
     // sveglia del rientro già programmata (sopravvive al processo: sta nelle preferenze)
     var svegliaAlle by remember { mutableStateOf(sveglia.programmata()) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
@@ -203,31 +207,37 @@ fun App(vm: StatoApp, collegamento: Collegamento, firmatario: FirmatarioAdmin) {
                             }
                             svegliaAlle = sveglia.programmata()
                         },
-                        onRegistra = soloSeAttivaDue { tipo, conSveglia -> nav.navigate("registra/${tipo.kind}/$conSveglia") },
+                        causaleScelta = causaleScelta, causaleToccata = causaleToccata,
+                        onCausale = { causaleScelta = it; causaleToccata = true },
+                        onRegistra = soloSeAttivaTre { tipo, conSveglia, causale ->
+                            nav.navigate("registra/${tipo.kind}/$conSveglia/${causale?.codice ?: NESSUNA}")
+                        },
                     )
                 }
                 composable(Rotte.REGISTRA, listOf(navArgument("sveglia") { type = NavType.BoolType })) { e ->
                     val tipo = Tipo.da(e.arguments?.getString("kind"))
                     val conSveglia = e.arguments?.getBoolean("sveglia") ?: false
+                    val causale = e.arguments?.getString("causale") ?: NESSUNA
                     RegistrazioneScreen(
                         tipo,
                         onRegistrata = { r ->
                             vm.ripresa?.cancella()  // una ripresa precedente mai confermata
                             vm.ripresa = r
-                            nav.navigate("conferma/${tipo.kind}/$conSveglia") { popUpTo(Rotte.REGISTRA) { inclusive = true } }
+                            nav.navigate("conferma/${tipo.kind}/$conSveglia/$causale") { popUpTo(Rotte.REGISTRA) { inclusive = true } }
                         },
                         onAnnulla = dropUnlessResumed { nav.popBackStack() },
                     )
                 }
                 composable(Rotte.CONFERMA, listOf(navArgument("sveglia") { type = NavType.BoolType })) { e ->
                     val tipo = Tipo.da(e.arguments?.getString("kind"))
-                    val conSveglia = tipo == Tipo.USCITA && e.arguments?.getBoolean("sveglia") == true
+                    val causale = Causale.da(e.arguments?.getString("causale"))
+                    val conSveglia = tipo == Tipo.USCITA && causale == null && e.arguments?.getBoolean("sveglia") == true
                     val app = contesto.applicationContext as TimbroApp
                     val livello = remember { app.chiavi.livello(Chiavi.TIMBRATURE) }
                     var inCorso by remember { mutableStateOf(false) }
                     var errore by remember { mutableStateOf<String?>(null) }
                     ConfermaScreen(
-                        tipo, vm.ripresa, conSveglia, livello, inCorso, errore,
+                        tipo, causale, vm.ripresa, conSveglia, livello, inCorso, errore,
                         onConferma = dropUnlessResumed {
                             val r = vm.ripresa
                             if (r == null || inCorso) return@dropUnlessResumed
@@ -236,7 +246,7 @@ fun App(vm: StatoApp, collegamento: Collegamento, firmatario: FirmatarioAdmin) {
                             // nello scope del ViewModel: firma, attestazione e coda finiscono anche se si esce dalla schermata
                             vm.viewModelScope.launch {
                                 try {
-                                    val voce = Timbratrice(app).timbra(r, tipo.kind)
+                                    val voce = Timbratrice(app).timbra(r, tipo.kind, causale)
                                     vm.ripresa = null
                                     val quando = LocalDateTime.ofInstant(Instant.ofEpochMilli(voce.creataIl), ZoneId.systemDefault())
                                     when {
@@ -249,6 +259,8 @@ fun App(vm: StatoApp, collegamento: Collegamento, firmatario: FirmatarioAdmin) {
                                     svegliaAlle = sveglia.programmata()
                                     scelta = null
                                     svegliaScelta = null
+                                    causaleScelta = null
+                                    causaleToccata = false
                                     nav.popBackStack(Rotte.TIMBRA, inclusive = false)
                                 } catch (ex: Exception) {
                                     errore = "Non sono riuscito a firmare la timbratura: ${ex.message}"
@@ -386,11 +398,14 @@ fun App(vm: StatoApp, collegamento: Collegamento, firmatario: FirmatarioAdmin) {
     }
 }
 
-/** [soloSeAttiva] con due argomenti (tipo e sveglia). */
+/** Nella rotta: nessuna causale. */
+private const val NESSUNA = "-"
+
+/** [soloSeAttiva] con tre argomenti (tipo, sveglia e causale). */
 @Composable
-private fun <A, B> soloSeAttivaDue(azione: (A, B) -> Unit): (A, B) -> Unit {
+private fun <A, B, C> soloSeAttivaTre(azione: (A, B, C) -> Unit): (A, B, C) -> Unit {
     val owner = LocalLifecycleOwner.current
-    return { a, b -> if (owner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) azione(a, b) }
+    return { a, b, c -> if (owner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) azione(a, b, c) }
 }
 
 /** Segnalazione di tutta la giornata: l'esito di una contestazione precedente non si mostra più. */

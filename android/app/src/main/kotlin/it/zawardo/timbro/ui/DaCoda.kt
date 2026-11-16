@@ -1,5 +1,6 @@
 package it.zawardo.timbro.ui
 
+import it.zawardo.timbro.core.Causale
 import it.zawardo.timbro.core.Manifest
 import it.zawardo.timbro.core.StatoInvio as StatoCoda
 import it.zawardo.timbro.core.api.ApiJson
@@ -41,6 +42,7 @@ fun TimbraturaInCoda.perInterfaccia(): Timbratura {
         precisioneGpsM = m?.location?.accuracyM?.roundToInt() ?: 0,
         catena = catena(),
         clientId = clientId,
+        causale = Causale.da(causale),
     )
 }
 
@@ -58,7 +60,7 @@ private fun TimbraturaInCoda.catena() = CatenaProve(
 
 /** Una voce di `GET /history` per la cache (giorno in ora italiana, come la raggruppa il server). */
 fun VoceStorico.perCache(giorno: LocalDate) = VoceInCache(
-    id, clientId, kind, time, ricevutaIl, giorno.toString(), video, marcataQualificata, attestazioneOk, contested, keep,
+    id, clientId, kind, time, ricevutaIl, giorno.toString(), video, marcataQualificata, attestazioneOk, contested, keep, reason,
 )
 
 /**
@@ -66,7 +68,7 @@ fun VoceStorico.perCache(giorno: LocalDate) = VoceInCache(
  * lette dal worker (Bitcoin, problemi dell'attestazione) completano quelle dello storico.
  */
 fun VoceInCache.perInterfaccia(riga: TimbraturaInCoda?): Timbratura {
-    val voce = VoceStorico(id, clientId, kind, time, ricevutaIl, video, marcata, attestazioneOk, contestata, daTenere)
+    val voce = VoceStorico(id, clientId, kind, time, ricevutaIl, video, marcata, attestazioneOk, contestata, daTenere, causale)
     val marcata = marcata || riga?.marcata == true
     val ricevuto = video == "ricevuto" || (video != "cancellato" && riga?.videoRicevuto == true)
     val integro = attestazioneOk ?: riga?.integro
@@ -96,5 +98,6 @@ fun VoceInCache.perInterfaccia(riga: TimbraturaInCoda?): Timbratura {
         ),
         clientId = clientId,
         ricevutaIl = ricevutaIl,
+        causale = Causale.da(causale),
     )
 }

@@ -75,6 +75,8 @@ data class RichiestaTimbratura(
     val manifest: String,
     val signature: String,
     val attestation: List<String>? = null,
+    /** Causale ([it.zawardo.timbro.core.Causale]): fuori dal manifest firmato, conta solo per le ore. */
+    val reason: String? = null,
 )
 
 /** `GET /history?until&days`: giorni completi in ora italiana, dal più recente. */
@@ -113,4 +115,6 @@ data class VoceStorico(
     @SerialName("attestation_ok") val attestazioneOk: Boolean? = null,
     val contested: Boolean,
     val keep: Boolean,
+    /** Causale dichiarata ("service", "medical") o null. */
+    val reason: String? = null,
 )

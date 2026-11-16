@@ -6,7 +6,7 @@ admin_auth.py. Nessuna operazione cancella le prove: si possono eliminare solo i
 
 import json
 from datetime import date
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
@@ -18,7 +18,7 @@ from timbro import evidence, mailer, services
 from timbro.api import media
 from timbro.api.admin_auth import AdminDep
 from timbro.db import utcnow
-from timbro.validation import NoNulStr, PlausibleDatetime
+from timbro.validation import NoNulStr, PlausibleDatetime, Reason
 from timbro.models import ContestNotice, Punch, ShareAccess, ShareLink
 
 router = APIRouter(prefix="/api/v1/admin")
@@ -37,6 +37,7 @@ def _punch_summary(p: Punch) -> dict:
     st.update(
         keep=p.keep,
         contested=p.contested,
+        reason=p.reason,
         justification_ref=p.justification_ref,
         notes=p.notes,
         device_time=p.device_time,
@@ -101,6 +102,8 @@ def get_punch(punch_id: int, request: Request, device: AdminDep):
 class PunchPatch(BaseModel):
     keep: bool | None = None
     contested: bool | None = None
+    # causale (servizio o visita medica: il tempo fuori conta come presenza); "" o null la tolgono
+    reason: Reason | Literal[""] | None = None
     justification_ref: NoNulStr | None = Field(default=None, max_length=255)
     notes: NoNulStr | None = Field(default=None, max_length=4000)
 
@@ -112,6 +115,8 @@ def patch_punch(punch_id: int, body: PunchPatch, request: Request, device: Admin
         for field, value in body.model_dump(exclude_unset=True).items():
             if field in ("keep", "contested") and value is None:
                 raise HTTPException(422, f"{field} deve essere true o false")
+            if field == "reason":
+                value = value or None
             setattr(p, field, value)
         s.commit()
         return _punch_summary(p)

@@ -13,6 +13,7 @@ import androidx.lifecycle.viewModelScope
 import it.zawardo.timbro.BuildConfig
 import it.zawardo.timbro.TimbroApp
 import it.zawardo.timbro.acquisizione.Ripresa
+import it.zawardo.timbro.core.Causale
 import it.zawardo.timbro.core.EsitoOre
 import it.zawardo.timbro.core.Giornata
 import it.zawardo.timbro.core.Orario
@@ -320,6 +321,10 @@ class StatoApp(app: Application) : AndroidViewModel(app) {
         return Tipo.da(Proposta.tipo(ultima?.tipo?.kind, ultima?.quando?.toLocalDate(), oggi))
     }
 
+    /** Causale proposta per [tipo]: al rientro da un'uscita di servizio o per visita di oggi la stessa, se no nessuna. */
+    fun causaleProposta(tipo: Tipo, oggi: LocalDate = LocalDate.now()): Causale? =
+        Proposta.causale(tipo.kind, timbrature.maxByOrNull { it.quando }, oggi)
+
     // --- io, orario, rete -------------------------------------------------------------------------------------------
 
     private var ioServer by mutableStateOf<Io?>(null)
@@ -417,7 +422,7 @@ class StatoApp(app: Application) : AndroidViewModel(app) {
         return tenta { api.dettaglio(id, f).also { registra(it, completo = true) } }
     }
 
-    /** Flag, giustificativo e note (`PATCH /admin/punches/{id}`). */
+    /** Flag, causale, giustificativo e note (`PATCH /admin/punches/{id}`). */
     suspend fun modifica(t: Timbratura, m: ModificaTimbratura, f: FirmatarioAdmin): Risultato<Unit> {
         val id = t.serverId ?: return nonSulServer()
         if (dimostrazione) {
@@ -425,6 +430,7 @@ class StatoApp(app: Application) : AndroidViewModel(app) {
                 it.copy(
                     contestata = m.contested ?: it.contestata, daTenere = m.keep ?: it.daTenere,
                     giustificativo = m.giustificativo ?: it.giustificativo, note = m.notes ?: it.note,
+                    causale = m.reason?.let(Causale::da) ?: it.causale.takeIf { m.reason == null },
                 )
             }
             timbratura(t.id)?.let { dettagli[id] = dettaglioFinto(it) }
@@ -476,7 +482,7 @@ class StatoApp(app: Application) : AndroidViewModel(app) {
         val marcata = d.stamps.any { it.target == "video" && it.qualified && it.status == "complete" }
         aggiornaVoce(d.id) {
             it.copy(
-                contestata = d.contested, daTenere = d.keep, marcata = it.marcata || marcata,
+                contestata = d.contested, daTenere = d.keep, marcata = it.marcata || marcata, causale = d.reason,
                 video = when {
                     d.videoCancellatoIl != null -> "cancellato"
                     d.videoRicevuto -> "ricevuto"
@@ -860,6 +866,7 @@ class StatoApp(app: Application) : AndroidViewModel(app) {
             location = PosizioneRegistrata(41.9028, 12.4964, t.precisioneGpsM.toDouble(), "fused", false),
             attestation = EsitoAttestazione(t.attestazioneOk == true),
             keep = t.daTenere, contested = t.contestata, giustificativo = t.giustificativo.ifEmpty { null }, notes = t.note.ifEmpty { null },
+            reason = t.causale?.codice,
             videoDisponibile = !t.videoEliminato, videoCancellatoIl = if (t.videoEliminato) ricevuta else null,
             attestazione = DettaglioAttestazione(
                 t.attestazioneOk == true, livello = "tee", bloccato = true, avvio = "verified", patch = 202610,

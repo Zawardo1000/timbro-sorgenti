@@ -139,7 +139,8 @@ def _punch(s: Session, p: Punch, keys: dict, allow_evidence: bool, base: str, so
     return {
         "id": p.id,
         "kind": p.kind,
-        "label": "Entrata" if p.kind == "in" else "Uscita",
+        "reason": p.reason,
+        "label": orario.punch_label(p.kind, p.reason).capitalize(),
         "time": t,
         "contested": p.contested,
         "video_url": f"{base}/p/{p.id}/video" if p.video_path and not p.video_deleted_at else None,
@@ -167,28 +168,38 @@ def _punch(s: Session, p: Punch, keys: dict, allow_evidence: bool, base: str, so
 
 
 def _bar(punches: list[dict]) -> list[dict]:
-    """Tratti lavorati (entrata -> uscita successiva) in percentuale della barra 7-19."""
+    """Tratti lavorati (entrata -> uscita successiva) in percentuale della barra 7-19; fuori = tempo fuori per
+    servizio o per visita medica (uscita -> rientro), che conta come presenza."""
     out, start = [], None
     span = BAR_END - BAR_START
 
     def pct(m: int) -> float:
         return round((min(max(m, BAR_START), BAR_END) - BAR_START) / span * 100, 2)
 
+    def seg(a: int, b: int, fuori: bool = False) -> dict:
+        return {"left": pct(a), "width": max(pct(b) - pct(a), 0.5), "fuori": fuori}
+
     for p in punches:
         m = _minutes(p["time"])
         if p["kind"] == "in":
             start = m
         elif start is not None:
-            out.append({"left": pct(start), "width": max(pct(m) - pct(start), 0.5)})
+            out.append(seg(start, m))
             start = None
+    for a, b in zip(punches, punches[1:]):
+        if a["kind"] == "out" and b["kind"] == "in" and (a["reason"] or b["reason"]):
+            out.append(seg(_minutes(a["time"]), _minutes(b["time"]), True))
     return out
 
 
 def _pauses(punches: list[dict]) -> list[dict]:
+    """Fra un'uscita e il rientro: la pausa, oppure il tempo fuori per servizio o per visita medica."""
     out = []
     for a, b in zip(punches, punches[1:]):
         if a["kind"] == "out" and b["kind"] == "in":
-            out.append({"after": a["id"], "minutes": round((b["time"] - a["time"]).total_seconds() / 60)})
+            reason = a["reason"] or b["reason"]
+            out.append({"after": a["id"], "minutes": round((b["time"] - a["time"]).total_seconds() / 60),
+                        "label": orario.reason_name(reason) if reason else "pausa"})
     return out
 
 
@@ -227,7 +238,7 @@ def build(s: Session, sh: ShareLink, ids: list[int], base: str, sources: str = "
             "label": mailer.italian_day(d),
             "punches": items,
             "bar": _bar(items),
-            "pauses": {x["after"]: x["minutes"] for x in _pauses(items)},
+            "pauses": {x["after"]: x for x in _pauses(items)},
             "chain_stamps": [_stamp(st) for st in sorted(chain, key=_stamp_order) if _visible(st)],
         })
     notices = s.scalars(select(ContestNotice).where(ContestNotice.share_id == sh.id).order_by(ContestNotice.id)).all()

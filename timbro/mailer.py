@@ -46,18 +46,18 @@ class Mail:
     body: str
 
 
-def compose(full_name: str, employee_number: str, day: date, punch: tuple[str, datetime] | None,
-            punches: list[tuple[str, datetime]], hours, url: str, valid_until: date, note: str | None) -> Mail:
-    """Testo standard della contestazione (oggetto e corpo). punch = (tipo, ora) della timbratura contestata, None
-    per tutta la giornata; hours = esito di orario.compute con l'orario dell'utente, None se non c'è un orario."""
+def compose(full_name: str, employee_number: str, day: date, punch: tuple[str, datetime, str | None] | None,
+            punches: list[tuple[str, datetime, str | None]], hours, url: str, valid_until: date, note: str | None) -> Mail:
+    """Testo standard della contestazione (oggetto e corpo). punch = (tipo, ora, causale) della timbratura
+    contestata, None per tutta la giornata; punches = le timbrature del giorno, allo stesso modo; hours = esito di
+    orario.compute con l'orario dell'utente, None se non c'è un orario."""
     from timbro import orario
 
     first = (f"{full_name}, matricola {employee_number}, segnala un disallineamento tra i dati di presenza registrati "
              f"dall'ente per {italian_day(day)} e quanto effettivamente avvenuto")
     if punch is not None:
-        which = "l'entrata" if punch[0] == "in" else "l'uscita"
-        first += f", in particolare per {which} delle {punch[1]:%H:%M}"
-    listed = ", ".join(f"{'entrata' if k == 'in' else 'uscita'} {t:%H:%M}" for k, t in punches)
+        first += f", in particolare per l'{orario.punch_label(punch[0], punch[2])} delle {punch[1]:%H:%M}"
+    listed = ", ".join(f"{orario.punch_label(k, r)} {t:%H:%M}" for k, t, r in punches)
     second = f"Le timbrature della giornata sono: {listed}."
     if hours is not None:
         second += (f" Secondo l'articolazione oraria in vigore risultano {orario.duration(hours.worked_min)} di lavoro "

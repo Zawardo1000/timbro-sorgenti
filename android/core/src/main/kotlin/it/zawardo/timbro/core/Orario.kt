@@ -31,7 +31,12 @@ import kotlinx.serialization.json.Json
  *   con la pausa: conta almeno [VersioneOrario.pausaConteggiataMin] (sotto [VersioneOrario.rientroMinimoMin] la
  *   timbratrice non accetterebbe il rientro: anomalia), oltre conta la durata vera; le altre uscite contano per il
  *   tempo effettivo;
- * - senza pausa e oltre [VersioneOrario.sogliaSenzaPausaMin] di lavoro si tolgono [VersioneOrario.trattenutaSenzaPausaMin];
+ * - un'uscita di servizio o per visita medica ([Causale]) e il rientro che la chiude: il tempo fuori conta come
+ *   presenza e non è mai la pausa, anche senza orario. Basta la causale su una delle due; se non coincidono è
+ *   un'anomalia. Oggi, ancora fuori, conta fino ad "adesso"; un giorno passato senza rientro conta fino all'uscita
+ *   (anomalia);
+ * - senza pausa e oltre [VersioneOrario.sogliaSenzaPausaMin] di lavoro si tolgono [VersioneOrario.trattenutaSenzaPausaMin]
+ *   (anche con il tempo fuori);
  * - saldo = ore valide - dovute del giorno (0 nei giorni senza orario), solo per giornate complete.
  * I minuti si contano su ore e minuti delle timbrature (i secondi non contano), come sul terminale.
  */
@@ -169,30 +174,47 @@ object Ore {
         val correzioni = mutableListOf<Nota>()
         val anomalie = mutableListOf<Nota>()
         val coppie = mutableListOf<IntArray>()  // [inizio, fine] in minuti del giorno
+        val causali = mutableListOf<Pair<Causale?, Causale?>>()  // causali dell'entrata e dell'uscita di ogni coppia
         var aperta: Int? = null
+        var causaleAperta: Causale? = null
+        var chiusa = false  // l'ultima timbratura è l'uscita che chiude una coppia
         for (s in ms) {
             val m = minuti(s.quando.toLocalTime())
             if (s.kind == Proposta.ENTRATA) {
                 aperta?.let { anomalie += Nota("uscita_mancante", mapOf("dopo" to hm(it))) }
                 aperta = m
+                causaleAperta = s.causale
+                chiusa = false
             } else {
                 val inizio = aperta
                 if (inizio == null) {
                     anomalie += Nota("entrata_mancante", mapOf("prima" to hm(m)))
+                    chiusa = false
                     continue
                 }
                 coppie += intArrayOf(inizio, m)
+                causali += causaleAperta to s.causale
                 aperta = null
+                chiusa = true
             }
         }
         var inCorso = false
-        aperta?.let { inizio ->
+        val causaleFuori = if (chiusa) causali.last().second else null  // ultima uscita con la causale: si rientrerà
+        val inizioAperta = aperta
+        if (inizioAperta != null) {
             if (adesso != null && adesso.toLocalDate() == giorno) {
-                coppie += intArrayOf(inizio, minuti(adesso.toLocalTime()))
+                coppie += intArrayOf(inizioAperta, minuti(adesso.toLocalTime()))
+                causali += causaleAperta to null
                 inCorso = true
             } else {
-                anomalie += Nota("uscita_mancante", mapOf("dopo" to hm(inizio)))
+                anomalie += Nota("uscita_mancante", mapOf("dopo" to hm(inizioAperta)))
             }
+        } else if (causaleFuori != null && adesso != null && adesso.toLocalDate() == giorno) {
+            // ancora fuori per servizio o per visita: un rientro adesso, così il tempo fuori conta fino ad adesso
+            val m = minuti(adesso.toLocalTime())
+            coppie += intArrayOf(m, m)
+            causali += causaleFuori to null
+            inCorso = true
         }
         val completa = anomalie.isEmpty() && !inCorso
 
@@ -213,11 +235,21 @@ object Ore {
         var lavorati = coppie.sumOf { maxOf(it[1] - it[0], 0) }
         var pausa: Int? = null
         var pausaConteggiata: Int? = null
-        if (versione != null) {
-            for (i in 0 until coppie.size - 1) {
-                val uscita = coppie[i][1]
-                val rientro = coppie[i + 1][0]
-                val vuoto = maxOf(rientro - uscita, 0)
+        for (i in 0 until coppie.size - 1) {
+            val uscita = coppie[i][1]
+            val rientro = coppie[i + 1][0]
+            val vuoto = maxOf(rientro - uscita, 0)
+            val cUscita = causali[i].second
+            val cRientro = causali[i + 1].first
+            val causale = cUscita ?: cRientro
+            if (causale != null) {
+                // fuori per servizio o per visita medica: presenza, mai la pausa (anche senza orario)
+                lavorati += vuoto
+                correzioni += Nota("fuori_in_presenza", mapOf("ora" to hm(uscita), "durata" to vuoto, "causale" to causale.codice))
+                if (cUscita != cRientro) {
+                    anomalie += Nota("causale_discordante", mapOf("uscita" to hm(uscita), "rientro" to hm(rientro)))
+                }
+            } else if (versione != null) {
                 val inFascia = minuti(versione.pausaDa) <= uscita && uscita <= minuti(versione.pausaA)
                 if (pausa == null && regola != null && regola.pause && inFascia) {
                     val contata = maxOf(vuoto, versione.pausaConteggiataMin)
@@ -234,13 +266,16 @@ object Ore {
                     correzioni += Nota("uscita_non_pausa", mapOf("ora" to hm(uscita), "durata" to vuoto))
                 }
             }
-            if (pausa == null && lavorati > versione.sogliaSenzaPausaMin) {
-                lavorati -= versione.trattenutaSenzaPausaMin
-                correzioni += Nota(
-                    "pausa_non_fatta",
-                    mapOf("tolti" to versione.trattenutaSenzaPausaMin, "oltre" to versione.sogliaSenzaPausaMin),
-                )
-            }
+        }
+        if (causaleFuori != null && !inCorso) {
+            anomalie += Nota("senza_rientro", mapOf("ora" to hm(coppie.last()[1]), "causale" to causaleFuori.codice))
+        }
+        if (versione != null && pausa == null && lavorati > versione.sogliaSenzaPausaMin) {
+            lavorati -= versione.trattenutaSenzaPausaMin
+            correzioni += Nota(
+                "pausa_non_fatta",
+                mapOf("tolti" to versione.trattenutaSenzaPausaMin, "oltre" to versione.sogliaSenzaPausaMin),
+            )
         }
         lavorati = maxOf(lavorati, 0)
         return EsitoOre(
@@ -279,9 +314,15 @@ object Ore {
             "rientro_troppo_presto" -> "rientro dopo ${p["durata"]}′, prima dei ${p["minimo"]}′ che la timbratrice accetta"
             "uscita_mancante" -> "manca l'uscita dopo l'entrata delle ${p["dopo"]}"
             "entrata_mancante" -> "manca l'entrata prima dell'uscita delle ${p["prima"]}"
+            "fuori_in_presenza" -> "fuori per ${nomeCausale(p["causale"])} dalle ${p["ora"]}: ${p["durata"]}′ contati come presenza"
+            "causale_discordante" ->
+                "causale diversa fra l'uscita delle ${p["uscita"]} e il rientro delle ${p["rientro"]}: il tempo fuori conta comunque come presenza"
+            "senza_rientro" -> "fuori per ${nomeCausale(p["causale"])} dalle ${p["ora"]} senza rientro: le ore contano fino all'uscita"
             else -> n.codice
         }
     }
+
+    private fun nomeCausale(codice: Any?): String = Causale.da(codice as? String)?.nome ?: codice.toString()
 
     private val GIORNI = mapOf(1 to "lunedì", 2 to "martedì", 3 to "mercoledì", 4 to "giovedì", 5 to "venerdì", 6 to "sabato", 7 to "domenica")
     private val HHMM = DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT)
@@ -303,6 +344,7 @@ object Ore {
                 "${v.pausaConteggiataMin} minuti conta la durata effettiva.",
             "Senza pausa, oltre ${v.sogliaSenzaPausaMin / 60} ore di lavoro si tolgono ${v.trattenutaSenzaPausaMin} minuti.",
             "Le altre uscite contano per il tempo effettivo.",
+            "Le uscite di servizio e per visita medica, dichiarate da chi timbra, contano come presenza fino al rientro.",
         )
     }
 }

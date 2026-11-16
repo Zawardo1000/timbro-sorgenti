@@ -41,6 +41,8 @@ data class DettaglioTimbratura(
     val wifi: RiepilogoWifi? = null,
     /** Solo nel dettaglio: le mail di contestazione mandate per questa timbratura. */
     val notices: List<AvvisoMail> = emptyList(),
+    /** Causale dichiarata ("service", "medical") o null. */
+    val reason: String? = null,
 )
 
 /** Esito completo dell'attestazione (`timbro/attestation.py`, `Result`). */
@@ -102,6 +104,8 @@ data class ModificaTimbratura(
     val contested: Boolean? = null,
     @SerialName("justification_ref") val giustificativo: String? = null,
     val notes: String? = null,
+    /** Causale nuova ("service", "medical"); "" la toglie, null la lascia com'è (il campo non si manda). */
+    val reason: String? = null,
 )
 
 /** `POST /admin/punches/{id}/video-ticket`: URL relativo (`/api/v1/media/<ticket>`) valido pochi minuti. */

@@ -71,6 +71,9 @@ class Punch(Base):
     device_id: Mapped[str] = mapped_column(ForeignKey("devices.id"))
     client_id: Mapped[str] = mapped_column(String(36))
     kind: Mapped[str] = mapped_column(String(3))  # in | out
+    # causale dichiarata da chi timbra (orario.REASONS: service | medical): il tempo fuori conta come presenza. Non è
+    # nel manifest firmato: è una comodità per il calcolo delle ore, si cambia dopo come le note (PATCH admin)
+    reason: Mapped[str | None] = mapped_column(String(16))
     sha256: Mapped[str] = mapped_column(String(64), index=True)
     size: Mapped[int] = mapped_column(Integer)
     duration_ms: Mapped[int] = mapped_column(Integer)

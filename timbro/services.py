@@ -150,9 +150,10 @@ def check_attestation(
 
 def create_punch(
     s: Session, device: Device, m: Manifest, raw: bytes, signature: bytes, settings: Settings,
-    attestation_items: list[str] | None = None,
+    attestation_items: list[str] | None = None, reason: str | None = None,
 ) -> tuple[Punch, bool]:
-    """Registra la timbratura ed accoda le marche. Idempotente su (device, client_id).
+    """Registra la timbratura ed accoda le marche. Idempotente su (device, client_id): un nuovo invio della stessa
+    timbratura non cambia niente, nemmeno la causale (che dopo si cambia con il PATCH admin).
 
     La catena si estende sotto un lock "advisory" di Postgres legato alla transazione: le timbrature
     si accodano una alla volta anche fra thread (e processi) diversi, e il lock si libera al commit.
@@ -172,6 +173,7 @@ def create_punch(
         device_id=device.id,
         client_id=m.client_id,
         kind=m.kind,
+        reason=reason,
         sha256=m.sha256,
         size=m.size,
         duration_ms=m.duration_ms,
@@ -344,6 +346,7 @@ def _history_item(p: Punch, t: datetime) -> dict:
         "id": p.id,
         "client_id": p.client_id,
         "kind": p.kind,
+        "reason": p.reason,
         "time": t.isoformat(),
         "server_received_at": p.server_received_at.isoformat(),
         "video": video,
@@ -637,7 +640,7 @@ def day_hours(s: Session, user_id: int, day: date, punches: list[Punch] | None =
     from timbro import orario
 
     punches = day_punches(s, user_id, day) if punches is None else punches
-    marks = [orario.Mark(p.kind, punch_time(p).astimezone(LOCAL_TZ).replace(tzinfo=None)) for p in punches]
+    marks = [orario.Mark(p.kind, punch_time(p).astimezone(LOCAL_TZ).replace(tzinfo=None), p.reason) for p in punches]
     schedule = get_schedules(s, user_id).at(day)
     local_now = now.astimezone(LOCAL_TZ).replace(tzinfo=None) if now else None
     return orario.compute(marks, schedule, local_now), schedule
@@ -696,8 +699,8 @@ def contest(
     if to:
         mail = mailer.compose(
             profile["full_name"], profile["employee_number"], day,
-            (punch.kind, local) if punch is not None else None,
-            [(p.kind, punch_time(p).astimezone(LOCAL_TZ)) for p in punches],
+            (punch.kind, local, punch.reason) if punch is not None else None,
+            [(p.kind, punch_time(p).astimezone(LOCAL_TZ), p.reason) for p in punches],
             hours if schedule is not None else None,
             share_url(settings, token), share.expires_at.astimezone(LOCAL_TZ).date(), note,
         )

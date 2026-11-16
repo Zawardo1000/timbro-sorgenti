@@ -1,7 +1,7 @@
 """Tipi per gli input dell'API e del manifest: valori che Postgres rifiuterebbe diventano 422, non 500."""
 
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import AfterValidator, AwareDatetime
 
@@ -22,3 +22,5 @@ def _plausible(v: datetime | None) -> datetime | None:
 
 NoNulStr = Annotated[str, AfterValidator(_no_nul)]
 PlausibleDatetime = Annotated[AwareDatetime, AfterValidator(_plausible)]
+# causale di una timbratura (orario.REASONS): uscita di servizio o per visita medica, e il rientro che la chiude
+Reason = Literal["service", "medical"]

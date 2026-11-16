@@ -1,5 +1,5 @@
 {
-  "nota": "Casi del calcolo delle ore valide (timbro/orario.py e android/core). Li controllano tests/test_orario.py e i test Kotlin. Ore locali HH:MM; 'now' = giornata in corso contata fino a quell'ora. adjustments e anomalies: codici e parametri, nell'ordine.",
+  "nota": "Casi del calcolo delle ore valide (timbro/orario.py e android/core). Li controllano tests/test_orario.py e i test Kotlin. Ore locali HH:MM; il terzo elemento di una timbratura, se c'è, è la causale (service = uscita o rientro di servizio, medical = visita medica); 'now' = giornata in corso contata fino a quell'ora. adjustments e anomalies: codici e parametri, nell'ordine.",
   "schedule": {
     "versions": [
       {
@@ -550,6 +550,392 @@
           }
         }
       ]
+    },
+    {
+      "name": "uscita di servizio a metà mattina e poi la pausa: il tempo fuori conta come presenza",
+      "day": "2026-11-04",
+      "marks": [
+        [
+          "in",
+          "07:58"
+        ],
+        [
+          "out",
+          "10:00",
+          "service"
+        ],
+        [
+          "in",
+          "11:00",
+          "service"
+        ],
+        [
+          "out",
+          "12:31"
+        ],
+        [
+          "in",
+          "13:00"
+        ],
+        [
+          "out",
+          "16:30"
+        ]
+      ],
+      "worked_min": 482,
+      "due_min": 480,
+      "balance_min": 2,
+      "pause_min": 29,
+      "pause_counted_min": 30,
+      "open": false,
+      "complete": true,
+      "adjustments": [
+        {
+          "code": "fuori_in_presenza",
+          "params": {
+            "ora": "10:00",
+            "durata": 60,
+            "causale": "service"
+          }
+        },
+        {
+          "code": "pausa_minima",
+          "params": {
+            "durata": 29,
+            "conteggiata": 30
+          }
+        }
+      ],
+      "anomalies": []
+    },
+    {
+      "name": "visita medica sull'ora di pranzo senza pausa: oltre 6 ore si tolgono comunque 30 minuti",
+      "day": "2026-11-04",
+      "marks": [
+        [
+          "in",
+          "08:00"
+        ],
+        [
+          "out",
+          "12:00",
+          "medical"
+        ],
+        [
+          "in",
+          "14:00",
+          "medical"
+        ],
+        [
+          "out",
+          "16:30"
+        ]
+      ],
+      "worked_min": 480,
+      "due_min": 480,
+      "balance_min": 0,
+      "pause_min": null,
+      "pause_counted_min": null,
+      "open": false,
+      "complete": true,
+      "adjustments": [
+        {
+          "code": "fuori_in_presenza",
+          "params": {
+            "ora": "12:00",
+            "durata": 120,
+            "causale": "medical"
+          }
+        },
+        {
+          "code": "pausa_non_fatta",
+          "params": {
+            "tolti": 30,
+            "oltre": 360
+          }
+        }
+      ],
+      "anomalies": []
+    },
+    {
+      "name": "uscita di servizio con il rientro senza causale: conta lo stesso, causale discordante",
+      "day": "2026-11-04",
+      "marks": [
+        [
+          "in",
+          "08:00"
+        ],
+        [
+          "out",
+          "10:00",
+          "service"
+        ],
+        [
+          "in",
+          "10:45"
+        ],
+        [
+          "out",
+          "12:30"
+        ],
+        [
+          "in",
+          "13:00"
+        ],
+        [
+          "out",
+          "16:30"
+        ]
+      ],
+      "worked_min": 480,
+      "due_min": 480,
+      "balance_min": 0,
+      "pause_min": 30,
+      "pause_counted_min": 30,
+      "open": false,
+      "complete": true,
+      "adjustments": [
+        {
+          "code": "fuori_in_presenza",
+          "params": {
+            "ora": "10:00",
+            "durata": 45,
+            "causale": "service"
+          }
+        }
+      ],
+      "anomalies": [
+        {
+          "code": "causale_discordante",
+          "params": {
+            "uscita": "10:00",
+            "rientro": "10:45"
+          }
+        }
+      ]
+    },
+    {
+      "name": "rientro di servizio dopo un'uscita senza causale: basta una delle due",
+      "day": "2026-11-04",
+      "marks": [
+        [
+          "in",
+          "08:00"
+        ],
+        [
+          "out",
+          "10:00"
+        ],
+        [
+          "in",
+          "11:00",
+          "service"
+        ],
+        [
+          "out",
+          "12:30"
+        ],
+        [
+          "in",
+          "13:00"
+        ],
+        [
+          "out",
+          "17:00"
+        ]
+      ],
+      "worked_min": 510,
+      "due_min": 480,
+      "balance_min": 30,
+      "pause_min": 30,
+      "pause_counted_min": 30,
+      "open": false,
+      "complete": true,
+      "adjustments": [
+        {
+          "code": "fuori_in_presenza",
+          "params": {
+            "ora": "10:00",
+            "durata": 60,
+            "causale": "service"
+          }
+        }
+      ],
+      "anomalies": [
+        {
+          "code": "causale_discordante",
+          "params": {
+            "uscita": "10:00",
+            "rientro": "11:00"
+          }
+        }
+      ]
+    },
+    {
+      "name": "uscita per visita medica a fine giornata senza rientro: le ore contano fino all'uscita",
+      "day": "2026-11-04",
+      "marks": [
+        [
+          "in",
+          "08:00"
+        ],
+        [
+          "out",
+          "12:30"
+        ],
+        [
+          "in",
+          "13:00"
+        ],
+        [
+          "out",
+          "15:00",
+          "medical"
+        ]
+      ],
+      "worked_min": 390,
+      "due_min": 480,
+      "balance_min": -90,
+      "pause_min": 30,
+      "pause_counted_min": 30,
+      "open": false,
+      "complete": true,
+      "adjustments": [],
+      "anomalies": [
+        {
+          "code": "senza_rientro",
+          "params": {
+            "ora": "15:00",
+            "causale": "medical"
+          }
+        }
+      ]
+    },
+    {
+      "name": "fuori per servizio adesso: il tempo fuori conta fino a ora",
+      "day": "2026-11-05",
+      "now": "11:15",
+      "marks": [
+        [
+          "in",
+          "08:00"
+        ],
+        [
+          "out",
+          "10:00",
+          "service"
+        ]
+      ],
+      "worked_min": 195,
+      "due_min": 480,
+      "balance_min": null,
+      "pause_min": null,
+      "pause_counted_min": null,
+      "open": true,
+      "complete": false,
+      "adjustments": [
+        {
+          "code": "fuori_in_presenza",
+          "params": {
+            "ora": "10:00",
+            "durata": 75,
+            "causale": "service"
+          }
+        }
+      ],
+      "anomalies": []
+    },
+    {
+      "name": "venerdì senza pausa con un'uscita di servizio",
+      "day": "2026-11-06",
+      "marks": [
+        [
+          "in",
+          "08:00"
+        ],
+        [
+          "out",
+          "09:30",
+          "service"
+        ],
+        [
+          "in",
+          "10:30",
+          "service"
+        ],
+        [
+          "out",
+          "12:00"
+        ]
+      ],
+      "worked_min": 240,
+      "due_min": 240,
+      "balance_min": 0,
+      "pause_min": null,
+      "pause_counted_min": null,
+      "open": false,
+      "complete": true,
+      "adjustments": [
+        {
+          "code": "fuori_in_presenza",
+          "params": {
+            "ora": "09:30",
+            "durata": 60,
+            "causale": "service"
+          }
+        }
+      ],
+      "anomalies": []
+    },
+    {
+      "name": "passaggio in ufficio prima della visita: conta dall'uscita timbrata, anche prima delle 9:30",
+      "day": "2026-11-04",
+      "marks": [
+        [
+          "in",
+          "07:30"
+        ],
+        [
+          "out",
+          "07:45",
+          "medical"
+        ],
+        [
+          "in",
+          "10:30",
+          "medical"
+        ],
+        [
+          "out",
+          "12:30"
+        ],
+        [
+          "in",
+          "13:00"
+        ],
+        [
+          "out",
+          "16:00"
+        ]
+      ],
+      "worked_min": 480,
+      "due_min": 480,
+      "balance_min": 0,
+      "pause_min": 30,
+      "pause_counted_min": 30,
+      "open": false,
+      "complete": true,
+      "adjustments": [
+        {
+          "code": "fuori_in_presenza",
+          "params": {
+            "ora": "07:45",
+            "durata": 165,
+            "causale": "medical"
+          }
+        }
+      ],
+      "anomalies": []
     }
   ]
 }

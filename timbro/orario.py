@@ -12,7 +12,11 @@ Regole (valori dell'orario attuale dell'utente come predefiniti):
 - è pausa la prima uscita tra pause_from e pause_to seguita da un rientro, nei giorni con la pausa: conta almeno
   pause_counted_min (sotto pause_terminal_min la timbratrice non accetterebbe il rientro: anomalia), oltre conta
   la durata vera; le altre uscite contano per il tempo effettivo;
-- senza pausa e oltre no_pause_after_min di lavoro si tolgono no_pause_deduct_min;
+- un'uscita di servizio o per visita medica (causale, REASONS) e il rientro che la chiude: il tempo fuori conta come
+  presenza e non è mai la pausa. Basta la causale su una delle due timbrature; se non coincidono è un'anomalia. Oggi,
+  ancora fuori, conta fino a "now"; un giorno passato senza rientro conta fino all'uscita (anomalia). La causale la
+  dichiara chi timbra e si può cambiare dopo: non fa parte della timbratura firmata;
+- senza pausa e oltre no_pause_after_min di lavoro si tolgono no_pause_deduct_min (anche con il tempo fuori);
 - saldo = ore valide - dovute del giorno (0 nei giorni senza orario), solo per giornate complete.
 I minuti si contano sulle ore e minuti delle timbrature (i secondi non contano), come sul terminale.
 """
@@ -74,10 +78,15 @@ class Schedules(BaseModel):
         return current
 
 
+# causali delle uscite (e dei rientri) il cui tempo fuori conta come presenza; il nome serve ai testi
+REASONS = {"service": "servizio", "medical": "visita medica"}
+
+
 @dataclass(frozen=True)
 class Mark:
     kind: str  # "in" | "out"
     at: datetime  # ora locale della timbratura
+    reason: str | None = None  # causale (REASONS) o None
 
 
 @dataclass
@@ -113,27 +122,38 @@ def compute(marks: list[Mark], schedule: Schedule | None, now: datetime | None =
     day = ms[0].at.date() if ms else (now.date() if now else None)
     adj: list[Note] = []
     anom: list[Note] = []
-    pairs: list[list[int | None]] = []  # [inizio, fine] in minuti del giorno
-    open_start = None
+    pairs: list[list[int]] = []  # [inizio, fine] in minuti del giorno
+    reasons: list[tuple[str | None, str | None]] = []  # causali dell'entrata e dell'uscita di ogni coppia
+    open_start = open_reason = None
+    closed = False  # l'ultima timbratura è l'uscita che chiude una coppia
     for mk in ms:
         m = _m(mk.at.time())
         if mk.kind == "in":
             if open_start is not None:
                 anom.append(Note("uscita_mancante", {"dopo": _hm(open_start)}))
-            open_start = m
+            open_start, open_reason, closed = m, mk.reason, False
         else:
             if open_start is None:
                 anom.append(Note("entrata_mancante", {"prima": _hm(m)}))
+                closed = False
                 continue
             pairs.append([open_start, m])
-            open_start = None
+            reasons.append((open_reason, mk.reason))
+            open_start, closed = None, True
     is_open = False
+    out_reason = reasons[-1][1] if closed else None  # ultima uscita con la causale: si è fuori, si rientrerà
     if open_start is not None:
         if now is not None and now.date() == day:
             pairs.append([open_start, _m(now.time())])
+            reasons.append((open_reason, None))
             is_open = True
         else:
             anom.append(Note("uscita_mancante", {"dopo": _hm(open_start)}))
+    elif out_reason and now is not None and now.date() == day:
+        # ancora fuori per servizio o per visita: un rientro adesso, così il tempo fuori conta fino a now
+        pairs.append([_m(now.time())] * 2)
+        reasons.append((out_reason, None))
+        is_open = True
     complete = not anom and not is_open
 
     rule = schedule.days.get(day.isoweekday()) if schedule and day else None
@@ -149,9 +169,15 @@ def compute(marks: list[Mark], schedule: Schedule | None, now: datetime | None =
 
     worked = sum(max(b - a, 0) for a, b in pairs)
     pause = pause_counted = None
-    if schedule:
-        for (_, out), (back, _) in zip(pairs, pairs[1:]):
-            gap = max(back - out, 0)
+    for (_, out), (back, _), (_, r_out), (r_in, _) in zip(pairs, pairs[1:], reasons, reasons[1:]):
+        gap = max(back - out, 0)
+        if r_out or r_in:
+            # fuori per servizio o per visita medica: presenza, mai la pausa (anche senza orario)
+            worked += gap
+            adj.append(Note("fuori_in_presenza", {"ora": _hm(out), "durata": gap, "causale": r_out or r_in}))
+            if r_out != r_in:
+                anom.append(Note("causale_discordante", {"uscita": _hm(out), "rientro": _hm(back)}))
+        elif schedule:
             in_window = _m(schedule.pause_from) <= out <= _m(schedule.pause_to)
             if pause is None and rule is not None and rule.pause and in_window:
                 pause = gap
@@ -163,9 +189,11 @@ def compute(marks: list[Mark], schedule: Schedule | None, now: datetime | None =
                     adj.append(Note("pausa_minima", {"durata": gap, "conteggiata": pause_counted}))
             else:
                 adj.append(Note("uscita_non_pausa", {"ora": _hm(out), "durata": gap}))
-        if pause is None and worked > schedule.no_pause_after_min:
-            worked -= schedule.no_pause_deduct_min
-            adj.append(Note("pausa_non_fatta", {"tolti": schedule.no_pause_deduct_min, "oltre": schedule.no_pause_after_min}))
+    if out_reason and not is_open:
+        anom.append(Note("senza_rientro", {"ora": _hm(pairs[-1][1]), "causale": out_reason}))
+    if schedule and pause is None and worked > schedule.no_pause_after_min:
+        worked -= schedule.no_pause_deduct_min
+        adj.append(Note("pausa_non_fatta", {"tolti": schedule.no_pause_deduct_min, "oltre": schedule.no_pause_after_min}))
     worked = max(worked, 0)
     return DayResult(
         worked_min=worked,
@@ -205,7 +233,27 @@ def describe(n: Note) -> str:
                                          "accetta",
         "uscita_mancante": lambda: f"manca l'uscita dopo l'entrata delle {p['dopo']}",
         "entrata_mancante": lambda: f"manca l'entrata prima dell'uscita delle {p['prima']}",
+        "fuori_in_presenza": lambda: f"fuori per {reason_name(p['causale'])} dalle {p['ora']}: {p['durata']}′ contati "
+                                     "come presenza",
+        "causale_discordante": lambda: f"causale diversa fra l'uscita delle {p['uscita']} e il rientro delle "
+                                       f"{p['rientro']}: il tempo fuori conta comunque come presenza",
+        "senza_rientro": lambda: f"fuori per {reason_name(p['causale'])} dalle {p['ora']} senza rientro: le ore "
+                                 "contano fino all'uscita",
     }.get(n.code, lambda: n.code)()
+
+
+def reason_name(reason: str) -> str:
+    """Nome della causale nei testi: "servizio", "visita medica"."""
+    return REASONS.get(reason, reason)
+
+
+def punch_label(kind: str, reason: str | None = None) -> str:
+    """Il tipo della timbratura in minuscolo, con la causale: "entrata", "uscita di servizio", ..."""
+    if reason == "service":
+        return "entrata di servizio" if kind == "in" else "uscita di servizio"
+    if reason == "medical":
+        return "entrata da visita medica" if kind == "in" else "uscita per visita medica"
+    return "entrata" if kind == "in" else "uscita"
 
 
 GIORNI_BREVI = {1: "lunedì", 2: "martedì", 3: "mercoledì", 4: "giovedì", 5: "venerdì", 6: "sabato", 7: "domenica"}
@@ -226,4 +274,5 @@ def describe_schedule(s: Schedule) -> list[str]:
         "la durata effettiva.",
         f"Senza pausa, oltre {s.no_pause_after_min // 60} ore di lavoro si tolgono {s.no_pause_deduct_min} minuti.",
         "Le altre uscite contano per il tempo effettivo.",
+        "Le uscite di servizio e per visita medica, dichiarate da chi timbra, contano come presenza fino al rientro.",
     ]

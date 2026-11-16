@@ -107,7 +107,7 @@ object Invio {
         try {
             if (t.stato == StatoInvio.DA_INVIARE) {
                 val catena = t.attestazione?.let { ApiJson.decodeFromString(ListSerializer(String.serializer()), it) }
-                val s = app.api.inviaTimbratura(t.manifest, t.firma, catena)
+                val s = app.api.inviaTimbratura(t.manifest, t.firma, catena, t.causale)
                 dao.avanza(t.id, if (s.videoRicevuto) StatoInvio.COMPLETA else StatoInvio.VIDEO_DA_INVIARE, s.id)
                 salvaProve(dao, t.id, s)
                 if (s.videoRicevuto) File(t.percorsoVideo).delete()

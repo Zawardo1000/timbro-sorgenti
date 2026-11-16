@@ -5,11 +5,17 @@ import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
 
-/** Quello che serve di una timbratura per ragionare sulla giornata: entrata o uscita, e quando. */
+/** Quello che serve di una timbratura per ragionare sulla giornata: entrata o uscita, quando e con quale causale. */
 interface Segno {
     val kind: String
     val quando: LocalDateTime
+
+    /** Uscita di servizio o per visita medica (e il suo rientro): il tempo fuori conta come presenza. */
+    val causale: Causale? get() = null
 }
+
+/** Fra l'uscita [uscita] e il [rientro]: la causale di una delle due (basta una), o null se è un'uscita normale. */
+fun causaleFuori(uscita: Segno?, rientro: Segno?): Causale? = uscita?.causale ?: rientro?.causale
 
 /**
  * Un'entrata con l'uscita che la chiude. Una delle due può mancare: uscita dimenticata, oppure (giornata in corso)
@@ -34,24 +40,43 @@ data class Coppia<T : Segno>(val entrata: T?, val uscita: T?) {
 class Giornata<T : Segno>(val giorno: LocalDate, segni: List<T>) {
     val segni: List<T> = segni.filter { it.quando.toLocalDate() == giorno }.sortedBy { it.quando }
     val coppie: List<Coppia<T>> = accoppia(this.segni)
-    val uscite: Int get() = segni.count { it.kind == Proposta.USCITA }
+
+    /**
+     * Uscite senza causale: la pausa e la fine della giornata. Quelle di servizio o per visita medica non contano (si
+     * rientra e il tempo fuori è presenza): la sveglia e la Pausa di Timbra ragionano su queste.
+     */
+    val uscite: Int get() = segni.count { it.kind == Proposta.USCITA && it.causale == null }
 
     /** L'ultima è un'entrata: si sta lavorando. */
     val inCorso: Boolean get() = coppie.lastOrNull()?.aperta == true
 
-    /** Dopo la prima uscita del giorno e prima del rientro. */
-    val inPausa: Boolean get() = segni.lastOrNull()?.kind == Proposta.USCITA && uscite == 1
+    /** Dopo la prima uscita (senza causale) del giorno e prima del rientro. */
+    val inPausa: Boolean get() = segni.lastOrNull()?.let { it.kind == Proposta.USCITA && it.causale == null } == true && uscite == 1
 
-    /** Pausa fra la prima uscita e il rientro, se c'è stato. */
-    val pausa: Duration?
-        get() {
-            val uscita = coppie.getOrNull(0)?.uscita ?: return null
-            val rientro = coppie.getOrNull(1)?.entrata ?: return null
-            return Duration.between(uscita.quando, rientro.quando).coerceAtLeast(Duration.ZERO)
+    /** Fuori per servizio o per visita medica adesso: l'ultima è un'uscita con la causale. */
+    val fuori: Causale? get() = segni.lastOrNull()?.takeIf { it.kind == Proposta.USCITA }?.causale
+
+    /** Ogni uscita seguita da un rientro, in ordine, con la causale (null = pausa o uscita normale). */
+    val intervalli: List<Intervallo<T>>
+        get() = coppie.zipWithNext().mapNotNull { (a, b) ->
+            val u = a.uscita ?: return@mapNotNull null
+            val r = b.entrata ?: return@mapNotNull null
+            Intervallo(u, r, causaleFuori(u, r))
         }
 
-    /** Tempo lavorato; con [ora] (oggi) conta anche la coppia aperta fino a quel momento. */
-    fun lavorato(ora: LocalDateTime? = null): Duration = coppie.fold(Duration.ZERO) { tot, c -> tot + c.durata(ora) }
+    /** Pausa: la prima uscita senza causale con il suo rientro, se c'è stato. */
+    val pausa: Duration? get() = intervalli.firstOrNull { it.causale == null }?.durata
+
+    /**
+     * Tempo lavorato lordo (senza le regole dell'orario, che stanno in [Ore.calcola]), con il tempo fuori per servizio
+     * o per visita medica; con [ora] (oggi) conta anche la coppia aperta, o il tempo fuori, fino a quel momento.
+     */
+    fun lavorato(ora: LocalDateTime? = null): Duration {
+        val fuoriOra = segni.lastOrNull()?.takeIf { fuori != null && ora != null && ora.toLocalDate() == giorno }
+            ?.let { Duration.between(it.quando, ora).coerceAtLeast(Duration.ZERO) } ?: Duration.ZERO
+        return coppie.fold(Duration.ZERO) { tot, c -> tot + c.durata(ora) } +
+            intervalli.filter { it.causale != null }.fold(Duration.ZERO) { tot, i -> tot + i.durata } + fuoriOra
+    }
 
     companion object {
         /** Giornate dal più recente, solo quelle con timbrature. */
@@ -74,6 +99,11 @@ class Giornata<T : Segno>(val giorno: LocalDate, segni: List<T>) {
             return out
         }
     }
+}
+
+/** Un'uscita e il rientro che la segue; [causale] di servizio o visita medica, null se è la pausa o un'uscita normale. */
+data class Intervallo<T : Segno>(val uscita: T, val rientro: T, val causale: Causale?) {
+    val durata: Duration get() = Duration.between(uscita.quando, rientro.quando).coerceAtLeast(Duration.ZERO)
 }
 
 /** Settimane da lunedì, con il totale lavorato. */
@@ -105,10 +135,10 @@ object PausaMinima {
 
     /**
      * Tempo che manca se si sta per timbrare un'entrata subito dopo un'uscita dello stesso giorno, altrimenti null:
-     * è il caso in cui chiedere conferma.
+     * è il caso in cui chiedere conferma. Il rientro da un'uscita di servizio o per visita medica non è una pausa.
      */
     fun daConfermare(kind: String, ultima: Segno?, ora: LocalDateTime): Duration? {
-        if (kind != Proposta.ENTRATA || ultima == null || ultima.kind != Proposta.USCITA) return null
+        if (kind != Proposta.ENTRATA || ultima == null || ultima.kind != Proposta.USCITA || ultima.causale != null) return null
         if (ultima.quando.toLocalDate() != ora.toLocalDate()) return null
         return mancante(ultima.quando, ora).takeIf { !it.isZero }
     }
@@ -121,7 +151,8 @@ object PausaMinima {
 object Sveglia {
     /**
      * Accesa di default alla prima uscita di un giorno con la pausa (si torna dopo), spenta dalla seconda (fine
-     * giornata) e nei giorni senza pausa, come il venerdì a mezza giornata ([VersioneOrario.conPausa]).
+     * giornata) e nei giorni senza pausa, come il venerdì a mezza giornata ([VersioneOrario.conPausa]). Le uscite di
+     * servizio e per visita medica non contano ([Giornata.uscite]) e non hanno la sveglia.
      */
     fun predefinita(usciteGiaFatteOggi: Int, conPausa: Boolean = true): Boolean = usciteGiaFatteOggi == 0 && conPausa
 

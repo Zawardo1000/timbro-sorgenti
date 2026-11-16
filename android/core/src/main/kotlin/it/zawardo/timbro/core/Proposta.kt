@@ -17,4 +17,11 @@ object Proposta {
         ultimoTipo == ENTRATA -> USCITA
         else -> ENTRATA
     }
+
+    /**
+     * Causale da proporre (le spunte di Timbra, spente di default): al rientro dopo un'uscita di servizio o per visita
+     * medica di oggi, la stessa; altrimenti nessuna. Il giorno dopo si riparte senza.
+     */
+    fun causale(tipo: String, ultima: Segno?, oggi: LocalDate): Causale? =
+        ultima?.takeIf { tipo == ENTRATA && it.kind == USCITA && it.quando.toLocalDate() == oggi }?.causale
 }

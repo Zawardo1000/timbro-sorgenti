@@ -1,5 +1,6 @@
 package it.zawardo.timbro.core.api
 
+import it.zawardo.timbro.core.Causale
 import it.zawardo.timbro.core.Orario
 import it.zawardo.timbro.core.Ore
 import it.zawardo.timbro.core.Segno
@@ -25,7 +26,7 @@ import org.junit.Test
  * la mail del server devono coincidere carattere per carattere.
  */
 class TestoMailTest {
-    private data class S(override val kind: String, override val quando: LocalDateTime) : Segno
+    private data class S(override val kind: String, override val quando: LocalDateTime, override val causale: Causale? = null) : Segno
 
     private fun esempi(nome: String): JsonObject {
         var dir: File? = File(System.getProperty("user.dir")).absoluteFile
@@ -38,13 +39,13 @@ class TestoMailTest {
     fun `stesso testo del server per tutti i casi`() {
         val orario = Orario.JSON.decodeFromJsonElement(Orario.serializer(), esempi("orario.json")["schedule"]!!)
         val casi = esempi("mail.json")["cases"]!!.jsonArray.map { it.jsonObject }
-        assertEquals(4, casi.size)
+        assertEquals(5, casi.size)
         for (c in casi) {
             val nome = c["name"]!!.jsonPrimitive.content
             val giorno = LocalDate.parse(c["day"]!!.jsonPrimitive.content)
             val segni = c["marks"]!!.jsonArray.map { m ->
-                val (k, hm) = m.jsonArray.map { it.jsonPrimitive.content }
-                S(k, giorno.atTime(LocalTime.parse(hm)))
+                val v = m.jsonArray.map { it.jsonPrimitive.content }
+                S(v[0], giorno.atTime(LocalTime.parse(v[1])), Causale.da(v.getOrNull(2)))  // terzo elemento: la causale
             }
             val ore = if (c["with_schedule"]!!.jsonPrimitive.boolean) Ore.calcola(segni, orario.inVigore(giorno)) else null
             c["hours"]?.takeIf { it !is JsonNull }?.jsonObject?.let { h ->
@@ -54,12 +55,12 @@ class TestoMailTest {
                 assertEquals(nome, if (saldo == null || saldo is JsonNull) null else saldo.jsonPrimitive.int, ore.saldoMin)
             }
             val contestata = c["punch"]?.takeIf { it !is JsonNull }?.jsonArray?.let { p ->
-                p[0].jsonPrimitive.content to LocalTime.parse(p[1].jsonPrimitive.content)
+                VoceMail(p[0].jsonPrimitive.content, LocalTime.parse(p[1].jsonPrimitive.content), Causale.da(p.getOrNull(2)?.jsonPrimitive?.content))
             }
             val nota = c["note"]?.takeIf { it !is JsonNull }?.jsonPrimitive?.content
             val m = TestoMail.mail(
                 c["full_name"]!!.jsonPrimitive.content, c["employee_number"]!!.jsonPrimitive.content, giorno, contestata,
-                segni.map { it.kind to it.quando.toLocalTime() }, ore, c["url"]!!.jsonPrimitive.content,
+                segni.map { VoceMail(it.kind, it.quando.toLocalTime(), it.causale) }, ore, c["url"]!!.jsonPrimitive.content,
                 LocalDate.parse(c["valid_until"]!!.jsonPrimitive.content), nota,
             )
             assertEquals(nome, c["subject"]!!.jsonPrimitive.content, m.oggetto)
@@ -70,7 +71,8 @@ class TestoMailTest {
     @Test
     fun `nota vuota o di soli spazi non compare`() {
         val g = LocalDate.of(2026, 11, 5)
-        val m = TestoMail.mail("A B", "1", g, "in" to LocalTime.of(7, 58), listOf("in" to LocalTime.of(7, 58)), null, "u", g, "   ")
+        val e = VoceMail("in", LocalTime.of(7, 58))
+        val m = TestoMail.mail("A B", "1", g, e, listOf(e), null, "u", g, "   ")
         assertFalse("Nota:" in m.corpo)
         assertTrue("in particolare per l'entrata delle 07:58." in m.corpo)
         assertTrue("giovedì 5 novembre 2026" in m.corpo)

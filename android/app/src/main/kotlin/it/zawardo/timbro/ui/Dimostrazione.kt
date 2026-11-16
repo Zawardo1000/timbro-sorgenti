@@ -1,5 +1,6 @@
 package it.zawardo.timbro.ui
 
+import it.zawardo.timbro.core.Causale
 import it.zawardo.timbro.core.Orario
 import it.zawardo.timbro.core.RegolaGiorno
 import it.zawardo.timbro.core.VersioneOrario
@@ -73,7 +74,14 @@ internal object Dimostrazione {
                 listOf(8 to 1, 12 to 30, 12 to 58, 17 to 2),
                 mapOf(0 to { t -> t.copy(contestata = true, daTenere = true, giustificativo = "Prot. 4521 del ${ieri.dayOfMonth}/${ieri.monthValue}", note = "Terminale lento, badge passato due volte.") }),
             ),
+            // uscita di servizio a metà mattina: il tempo fuori conta come presenza
+            Modello(
+                listOf(7 to 58, 10 to 0, 11 to 5, 12 to 31, 13 to 0, 16 to 35),
+                mapOf(1 to { t -> t.copy(causale = Causale.SERVIZIO) }, 2 to { t -> t.copy(causale = Causale.SERVIZIO) }),
+            ),
             Modello(listOf(7 to 20, 12 to 30, 12 to 58, 16 to 40)),  // entrata prima delle 7:30: vale dalle 7:30
+            // visita medica a fine giornata, senza rientro: le ore contano fino all'uscita (giustificativo a parte)
+            Modello(listOf(8 to 2, 12 to 29, 12 to 59, 15 to 0), mapOf(3 to { t -> t.copy(causale = Causale.VISITA) })),
             Modello(listOf(7 to 55, 12 to 28, 12 to 50, 16 to 58), mapOf(2 to { t -> t.copy(stato = StatoInvio.RICEVUTA, retiGiaViste = 3) }, 3 to { t -> t.copy(daTenere = true) })),
             Modello(listOf(7 to 45, 15 to 10)),  // senza pausa oltre 6 ore: tolti 30 minuti
             Modello(listOf(8 to 0, 12 to 30, 13 to 0), mapOf(2 to { t -> t.copy(contestata = true) })),  // uscita dimenticata

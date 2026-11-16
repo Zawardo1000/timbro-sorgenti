@@ -142,11 +142,14 @@ class ClientApi(private val associazione: Associazione, private val chiavi: Chia
 
     // --- timbrature (coda del telefono, InvioWorker) ---------------------------------------------------------------
 
-    /** `POST /api/v1/punches`: byte esatti del manifest, firma e attestazione. Idempotente sul client_id. */
-    suspend fun inviaTimbratura(manifest: ByteArray, firma: ByteArray, attestazione: List<String>?): StatoTimbratura =
+    /**
+     * `POST /api/v1/punches`: byte esatti del manifest, firma, attestazione e causale (fuori dal manifest). Idempotente
+     * sul client_id: un nuovo invio non cambia la causale già registrata.
+     */
+    suspend fun inviaTimbratura(manifest: ByteArray, firma: ByteArray, attestazione: List<String>?, causale: String?): StatoTimbratura =
         withContext(Dispatchers.IO) {
             val b64 = Base64.getEncoder()
-            val corpo = RichiestaTimbratura(b64.encodeToString(manifest), b64.encodeToString(firma), attestazione)
+            val corpo = RichiestaTimbratura(b64.encodeToString(manifest), b64.encodeToString(firma), attestazione, causale)
             val req = richiesta("${ambiente.apiBase}/api/v1/punches".toHttpUrl())
                 .post(ApiJson.encodeToString(RichiestaTimbratura.serializer(), corpo).toRequestBody(json)).build()
             esegui(base(ambiente.mtls).build(), req, StatoTimbratura.serializer())

@@ -23,7 +23,7 @@ import org.junit.Test
 
 /** Calcolo delle ore valide: i casi condivisi con il backend (tests/fixtures/contratto/orario.json, tests/test_orario.py). */
 class OrarioTest {
-    private data class S(override val kind: String, override val quando: LocalDateTime) : Segno
+    private data class S(override val kind: String, override val quando: LocalDateTime, override val causale: Causale? = null) : Segno
 
     private fun esempi(nome: String): JsonObject {
         var dir: File? = File(System.getProperty("user.dir")).absoluteFile
@@ -49,13 +49,14 @@ class OrarioTest {
     @Test
     fun `casi condivisi con il backend, campo per campo`() {
         val casi = dati["cases"]!!.jsonArray.map { it.jsonObject }
-        assertEquals(14, casi.size)
+        assertEquals(22, casi.size)
         for (c in casi) {
             val nome = c["name"]!!.jsonPrimitive.content
             val giorno = LocalDate.parse(c["day"]!!.jsonPrimitive.content)
             val segni = c["marks"]!!.jsonArray.map { m ->
-                val (k, hm) = m.jsonArray.map { it.jsonPrimitive.content }
-                S(k, giorno.atTime(LocalTime.parse(hm)))
+                val v = m.jsonArray.map { it.jsonPrimitive.content }
+                // il terzo elemento, se c'è, è la causale
+                S(v[0], giorno.atTime(LocalTime.parse(v[1])), v.getOrNull(2)?.let { requireNotNull(Causale.da(it)) { it } })
             }
             val adesso = c["now"]?.let { giorno.atTime(LocalTime.parse(it.jsonPrimitive.content)) }
             val r = Ore.calcola(segni, orario.inVigore(giorno), adesso)

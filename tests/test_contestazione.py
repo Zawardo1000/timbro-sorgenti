@@ -238,9 +238,13 @@ def test_testo_della_mail_uguale_all_app():
     schedules = orario.Schedules.model_validate(json.loads((fixtures / "orario.json").read_text(encoding="utf-8"))["schedule"])
     for c in json.loads((fixtures / "mail.json").read_text(encoding="utf-8"))["cases"]:
         d = date.fromisoformat(c["day"])
-        marks = [(k, datetime.fromisoformat(f"{c['day']}T{hm}")) for k, hm in c["marks"]]
-        hours = orario.compute([orario.Mark(k, t) for k, t in marks], schedules.at(d)) if c["with_schedule"] else None
-        punch = (c["punch"][0], datetime.fromisoformat(f"{c['day']}T{c['punch'][1]}")) if c["punch"] else None
+        # il terzo elemento, se c'è, è la causale (service, medical)
+        marks = [(k, datetime.fromisoformat(f"{c['day']}T{hm}"), (r or [None])[0]) for k, hm, *r in c["marks"]]
+        hours = orario.compute([orario.Mark(*m) for m in marks], schedules.at(d)) if c["with_schedule"] else None
+        punch = None
+        if c["punch"]:
+            k, hm, *r = c["punch"]
+            punch = (k, datetime.fromisoformat(f"{c['day']}T{hm}"), (r or [None])[0])
         m = mailer.compose(c["full_name"], c["employee_number"], d, punch, marks, hours, c["url"],
                            date.fromisoformat(c["valid_until"]), c["note"])
         assert (m.subject, m.body) == (c["subject"], c["body"]), c["name"]

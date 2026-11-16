@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
@@ -91,6 +92,7 @@ import it.zawardo.timbro.acquisizione.Registratore
 import it.zawardo.timbro.acquisizione.Ripresa
 import it.zawardo.timbro.acquisizione.durataMs
 import it.zawardo.timbro.acquisizione.impronta
+import it.zawardo.timbro.core.Causale
 import it.zawardo.timbro.core.Ore
 import it.zawardo.timbro.core.PausaMinima
 import it.zawardo.timbro.core.Sveglia
@@ -123,6 +125,7 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 import java.time.Duration
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.util.Locale
 
@@ -153,6 +156,10 @@ private fun adesso(): LocalDateTime {
  * fra telefono e timbratrice). Nei giorni senza pausa dell'orario (il venerdì a mezza giornata) la prima uscita chiude
  * la giornata: niente Pausa e sveglia spenta di default. Il tipo si fissa al tocco di Registra; la data e la proposta
  * seguono l'ora, anche a mezzanotte.
+ *
+ * Due spunte, spente di default, dichiarano la causale: uscita di servizio o per visita medica (il tempo fuori conta
+ * come presenza). Dopo un'uscita con la causale la schermata propone il RIENTRO con la stessa spunta accesa, senza
+ * sveglia né pausa minima. La causale non entra nella timbratura firmata: si cambia dopo dallo Storico.
  */
 @Composable
 fun TimbraScreen(
@@ -163,45 +170,61 @@ fun TimbraScreen(
     onSveglia: (Boolean) -> Unit,
     svegliaAlle: LocalDateTime?,
     onSvegliaPausa: (Boolean) -> Unit,
-    onRegistra: (Tipo, Boolean) -> Unit,
+    /** Causale toccata a mano ([causaleToccata]); senza, vale quella proposta ([StatoApp.causaleProposta]). */
+    causaleScelta: Causale?,
+    causaleToccata: Boolean,
+    onCausale: (Causale?) -> Unit,
+    onRegistra: (Tipo, Boolean, Causale?) -> Unit,
 ) {
     val ora = adesso()
     val oggi = ora.toLocalDate()
     val giornata = vm.giornata(oggi)
     val proposta = vm.tipoProposto(oggi)
     val tipo = scelta ?: proposta
+    fun causalePer(t: Tipo, giorno: LocalDate) = if (causaleToccata) causaleScelta else vm.causaleProposta(t, giorno)
+    val causale = causalePer(tipo, oggi)
     val ultimaDiOggi = giornata.segni.lastOrNull()
-    // l'ultima uscita di oggi apre la pausa solo se è nella fascia della pausa di un giorno che ce l'ha
-    val ultimaApreLaPausa = ultimaDiOggi?.tipo == Tipo.USCITA && vm.uscitaDiPausa(oggi, ultimaDiOggi.quando.toLocalTime())
+    // fuori per servizio o per visita medica: si propone il rientro, il tempo fuori conta già come presenza
+    val fuoriDa = ultimaDiOggi?.takeIf { it.tipo == Tipo.USCITA && it.causale != null && tipo == Tipo.ENTRATA }
+    // l'ultima uscita di oggi apre la pausa solo se è nella fascia della pausa di un giorno che ce l'ha (e non ha causale)
+    val ultimaApreLaPausa = ultimaDiOggi?.tipo == Tipo.USCITA && ultimaDiOggi.causale == null &&
+        vm.uscitaDiPausa(oggi, ultimaDiOggi.quando.toLocalTime())
     val pausa = giornata.inPausa && tipo == Tipo.ENTRATA && ultimaApreLaPausa
     val uscitaPausa = if (pausa) ultimaDiOggi else null
     val mancante = uscitaPausa?.let { PausaMinima.mancante(it.quando, ora) } ?: Duration.ZERO
     val svegliaUscita = sveglia ?: vm.svegliaPredefinita(ora)
-    // giornata chiusa: dopo la seconda uscita, o dopo un'uscita che non apre la pausa (fuori fascia, venerdì)
-    val finita = ultimaDiOggi?.tipo == Tipo.USCITA && (giornata.uscite >= 2 || !ultimaApreLaPausa)
+    // giornata chiusa: dopo la seconda uscita, o dopo un'uscita che non apre la pausa (fuori fascia, venerdì); le uscite
+    // di servizio e per visita non la chiudono
+    val finita = ultimaDiOggi?.tipo == Tipo.USCITA && ultimaDiOggi.causale == null && (giornata.uscite >= 2 || !ultimaApreLaPausa)
 
     var conferma by rememberSaveable { mutableStateOf<Long?>(null) }  // minuti al rientro, se il dialogo è aperto
-    fun svegliaPer(t: Tipo) = t == Tipo.USCITA && (sveglia ?: vm.svegliaPredefinita(LocalDateTime.now()))
+    // niente sveglia sulle uscite di servizio e per visita: non sono la pausa
+    fun svegliaPer(t: Tipo, c: Causale?) = t == Tipo.USCITA && c == null && (sveglia ?: vm.svegliaPredefinita(LocalDateTime.now()))
     val registra = dropUnlessResumed {
         val adesso = LocalDateTime.now()
         val t = scelta ?: vm.tipoProposto(adesso.toLocalDate())
+        val c = causalePer(t, adesso.toLocalDate())
         val manca = PausaMinima.daConfermare(t.kind, vm.ultima(), adesso)
-        if (manca != null) conferma = PausaMinima.minutiArrotondati(manca) else onRegistra(t, svegliaPer(t))
+        if (manca != null) conferma = PausaMinima.minutiArrotondati(manca) else onRegistra(t, svegliaPer(t, c), c)
     }
 
     BoxWithConstraints(Modifier.fillMaxSize().background(Colori.Fondo)) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).heightIn(min = maxHeight)) {
-            val intestazione = if (uscitaPausa != null) "${oggi.senzaAnno()} · in pausa dalle ${uscitaPausa.quando.oraMinuti()}"
-            else "${oggi.senzaAnno()} · ${ora.oraMinuti()}"
+            val intestazione = when {
+                uscitaPausa != null -> "${oggi.senzaAnno()} · in pausa dalle ${uscitaPausa.quando.oraMinuti()}"
+                fuoriDa != null -> "${oggi.senzaAnno()} · fuori per ${fuoriDa.causale?.nome} dalle ${fuoriDa.quando.oraMinuti()}"
+                else -> "${oggi.senzaAnno()} · ${ora.oraMinuti()}"
+            }
             val didascalia = when {
                 uscitaPausa != null && !mancante.isZero -> "Pausa minima 15 min: puoi rientrare dalle ${PausaMinima.fine(uscitaPausa.quando).oraMinuti()}"
                 uscitaPausa != null -> "Pausa minima finita: puoi timbrare il rientro"
+                fuoriDa != null -> "Fuori da ${minutiFuori(fuoriDa.quando, ora)}: contano come presenza"
                 scelta != null && scelta != proposta -> "Scelta a mano · la proposta era ${proposta.etichetta}"
                 finita -> vm.ore(oggi).let { o ->
                     "Giornata finita: ${Ore.durata(o.lavoratiMin)} valide" + (o.saldoMin?.let { ", saldo ${Ore.saldo(it)}" } ?: "")
                 }
                 ultimaDiOggi == null -> "Proposta: prima timbratura di oggi"
-                else -> "Proposta: l'ultima è un'${ultimaDiOggi.tipo.etichetta.lowercase()} delle ${ultimaDiOggi.quando.oraMinuti()}"
+                else -> "Proposta: l'ultima è un'${ultimaDiOggi.etichetta.lowercase()} delle ${ultimaDiOggi.quando.oraMinuti()}"
             }
             val (testoRete, coloreRete) = when (vm.statoRete()) {
                 StatoRete.ONLINE -> "Online" to Colori.Entrata
@@ -213,7 +236,7 @@ fun TimbraScreen(
                 rete = testoRete,
                 coloreRete = coloreRete,
                 intestazione = intestazione,
-                parola = if (uscitaPausa != null) "RIENTRO" else tipo.etichetta.uppercase(Locale.ITALIAN),
+                parola = if (uscitaPausa != null || fuoriDa != null) "RIENTRO" else tipo.etichetta.uppercase(Locale.ITALIAN),
                 didascalia = didascalia,
                 tipo = tipo,
                 onTipo = onTipo,
@@ -235,6 +258,7 @@ fun TimbraScreen(
             )
             Spacer(Modifier.weight(1f).heightIn(min = 18.dp))
             Column(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                SceltaCausale(tipo, causale, onCausale)
                 when {
                     bloccoPausa -> SchedaSveglia(
                         titolo = if (svegliaAlle != null) "Sveglia alle ${svegliaAlle.oraMinuti()}" else "Sveglia spenta",
@@ -242,7 +266,7 @@ fun TimbraScreen(
                         accesa = svegliaAlle != null,
                         onCambia = onSvegliaPausa,
                     )
-                    tipo == Tipo.USCITA && uscitaPausa == null -> SchedaSveglia(
+                    tipo == Tipo.USCITA && uscitaPausa == null && causale == null -> SchedaSveglia(
                         titolo = "Sveglia per il rientro",
                         spiegazione = when {
                             svegliaUscita && giornata.uscite == 0 -> "Suona alle ${Sveglia.alle(ora).oraMinuti()}, 15 min dopo questa uscita · prima uscita di oggi"
@@ -276,14 +300,72 @@ fun TimbraScreen(
             confirmButton = {
                 TextButton(onClick = {
                     conferma = null
-                    val t = scelta ?: vm.tipoProposto(LocalDateTime.now().toLocalDate())
-                    onRegistra(t, svegliaPer(t))
+                    val adesso = LocalDateTime.now()
+                    val t = scelta ?: vm.tipoProposto(adesso.toLocalDate())
+                    val c = causalePer(t, adesso.toLocalDate())
+                    onRegistra(t, svegliaPer(t, c), c)
                 }) { Text("Registra lo stesso", style = Testo.Corpo15.copy(fontWeight = FontWeight.ExtraBold, color = Colori.Giallo)) }
             },
             dismissButton = {
                 TextButton(onClick = { conferma = null }) { Text("Aspetto", style = Testo.Corpo15.copy(fontWeight = FontWeight.Bold)) }
             },
         )
+    }
+}
+
+/** "25 min", "1 h 05": da quanto si è fuori per servizio o per visita. */
+private fun minutiFuori(da: LocalDateTime, ora: LocalDateTime): String {
+    val m = Duration.between(da, ora).toMinutes().coerceAtLeast(0).toInt()
+    return if (m < 60) "$m min" else Ore.durata(m)
+}
+
+/** Nome della spunta: "Di servizio" vale per l'uscita e per il rientro. */
+internal val Causale.spunta: String get() = if (this == Causale.SERVIZIO) "Di servizio" else "Visita medica"
+
+/**
+ * Le due spunte della causale, spente di default e una sola alla volta (toccare quella accesa la spegne). Sotto, quando
+ * una è accesa, cosa cambia: niente sveglia, il tempo fuori conta come presenza.
+ */
+@Composable
+private fun SceltaCausale(tipo: Tipo, causale: Causale?, onCausale: (Causale?) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Causale.entries.forEach { c ->
+                SpuntaCausale(c, causale == c, Modifier.weight(1f)) { accesa -> onCausale(if (accesa) c else null) }
+            }
+        }
+        if (causale != null) {
+            Text(
+                if (tipo == Tipo.USCITA) "Il tempo fuori conta come presenza · niente sveglia"
+                else "Rientro: il tempo fuori conta come presenza",
+                style = Testo.Piccolo12.copy(color = Colori.Fuori, fontWeight = FontWeight.SemiBold),
+                modifier = Modifier.padding(start = 4.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SpuntaCausale(c: Causale, accesa: Boolean, modifier: Modifier, onCambia: (Boolean) -> Unit) {
+    val forma = RoundedCornerShape(18.dp)
+    val quadrato = RoundedCornerShape(6.dp)
+    Row(
+        modifier.heightIn(min = 56.dp).clip(forma)
+            .background(if (accesa) Colori.Fuori else Colori.Superficie, forma)
+            .toggleable(value = accesa, role = Role.Checkbox, onValueChange = onCambia)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            Modifier.size(22.dp).then(
+                if (accesa) Modifier.background(Colori.SuColore, quadrato) else Modifier.border(2.dp, Colori.Disattivo, quadrato),
+            ),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (accesa) Icon(Icone.Fatto, contentDescription = null, tint = Colori.Fuori, modifier = Modifier.size(16.dp))
+        }
+        Text(c.spunta, style = Testo.Corpo15.copy(fontWeight = FontWeight.ExtraBold, color = if (accesa) Colori.SuColore else Colori.Inchiostro))
     }
 }
 
@@ -404,7 +486,7 @@ private fun AnelloPausa(mancante: Duration, fine: LocalDateTime, onClick: () -> 
 private fun UltimaConCatena(u: Timbratura) {
     Scheda(padding = PaddingValues(horizontal = 18.dp, vertical = 16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Ultima · ${u.tipo.etichetta}", style = Testo.Titolo15, modifier = Modifier.weight(1f))
+            Text("Ultima · ${u.etichetta}", style = Testo.Titolo15, modifier = Modifier.weight(1f))
             Text(u.quando.oraMinuti(), style = Testo.Mono16.copy(color = u.tipo.colore))
         }
         Spazio(14.dp)
@@ -468,7 +550,7 @@ private fun UltimaBreve(u: Timbratura) {
         Modifier.fillMaxWidth().background(Colori.Superficie, Forma22).padding(horizontal = 18.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("Ultima · ${u.tipo.etichetta}", style = Testo.Titolo15, modifier = Modifier.weight(1f))
+        Text("Ultima · ${u.etichetta}", style = Testo.Titolo15, modifier = Modifier.weight(1f))
         val (stato, colore) = when (u.stato) {
             StatoInvio.MARCATA -> "marcata" to Colori.Entrata
             StatoInvio.RICEVUTA -> "ricevuta" to Colori.Inchiostro
@@ -724,6 +806,7 @@ private fun Pastiglia(testo: String, fondo: Color = Colori.CameraChip, colore: C
 @Composable
 fun ConfermaScreen(
     tipo: Tipo,
+    causale: Causale?,
     ripresa: Ripresa?,
     sveglia: Boolean,
     livello: String,
@@ -744,7 +827,8 @@ fun ConfermaScreen(
                 return@Column
             }
             Text(
-                "${tipo.etichetta} delle ${ripresa.inizio.toLocalDateTime().format(DateTimeFormatter.ofPattern("HH:mm:ss"))}",
+                "${causale?.etichetta(tipo.kind)?.replaceFirstChar { it.uppercase() } ?: tipo.etichetta} delle " +
+                    ripresa.inizio.toLocalDateTime().format(DateTimeFormatter.ofPattern("HH:mm:ss")),
                 style = Testo.Titolo28.copy(color = tipo.colore),
             )
             Anteprima(ripresa, tipo)
@@ -768,7 +852,8 @@ fun ConfermaScreen(
                     if (sicuro) "Chip sicuro ${livello.uppercase(Locale.ROOT)}" else "Chiave software",
                     fondo = if (sicuro) Colori.Entrata else Colori.Giallo, colore = Colori.SuColore,
                 )
-                if (tipo == Tipo.USCITA) {
+                causale?.let { Pastiglia(it.spunta, fondo = Colori.Fuori, colore = Colori.SuColore) }
+                if (tipo == Tipo.USCITA && causale == null) {
                     Pastiglia(if (sveglia) "Sveglia tra 15 min" else "Sveglia spenta", fondo = if (sveglia) Colori.Giallo else Colori.Rilievo,
                         colore = if (sveglia) Colori.SuColore else Colori.Testo2)
                 }

@@ -27,6 +27,8 @@ object Colori {
     val Azzurro = Color(0xFF8ED0FF)
     val Rec = Color(0xFFFF3B3B)
     val Pericolo = Color(0xFFFF6B6B)
+    /** Uscite di servizio e per visita medica: il tempo fuori che conta come presenza (spunte, barra del giorno). */
+    val Fuori = Color(0xFFB79CFF)
 
     val Accento = Entrata                  // esiti positivi (marcata, integro)
     val AccentoChiaro = Color(0xFF12352A)

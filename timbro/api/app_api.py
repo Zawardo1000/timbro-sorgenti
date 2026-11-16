@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from timbro import services
 from timbro.db import utcnow
 from timbro.manifest import ManifestError, verify_and_parse
-from timbro.validation import NoNulStr
+from timbro.validation import NoNulStr, Reason
 from timbro.models import Device, Punch
 
 router = APIRouter(prefix="/api/v1")
@@ -110,6 +110,11 @@ class PunchIn(BaseModel):
         description="catena di Key Attestation di una chiave usa e getta con challenge = SHA-256 del manifest: "
         "certificati DER in base64, dalla foglia alla radice",
     )
+    reason: Reason | None = Field(
+        default=None,
+        description="causale dichiarata (uscita di servizio o per visita medica e il suo rientro): fuori dal manifest "
+        "firmato, conta solo per il calcolo delle ore e si cambia dopo con PATCH /admin/punches/{id}",
+    )
 
 
 @router.post("/punches")
@@ -129,7 +134,7 @@ def create_punch(body: PunchIn, s: SessionDep, device: DeviceDep, request: Reque
     if m.size > settings.max_video_bytes:
         raise HTTPException(413, "video troppo grande")
     try:
-        punch, created = services.create_punch(s, device, m, raw, sig, settings, body.attestation)
+        punch, created = services.create_punch(s, device, m, raw, sig, settings, body.attestation, body.reason)
     except ValueError as e:
         raise HTTPException(409, str(e)) from e
     if created and request.app.state.worker:

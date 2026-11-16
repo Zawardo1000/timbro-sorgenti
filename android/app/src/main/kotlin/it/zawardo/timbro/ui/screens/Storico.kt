@@ -107,6 +107,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.material3.AlertDialog
+import it.zawardo.timbro.core.Causale
 import it.zawardo.timbro.core.EsitoOre
 import it.zawardo.timbro.core.Giornata
 import it.zawardo.timbro.core.Ore
@@ -547,18 +548,25 @@ private fun SchedaGiorno(
 ) {
     val fondo by animateColorAsState(if (evidenziata) Colori.AccentoChiaro else Colori.Superficie, tween(500), label = "evidenza")
     val eOggi = g.giorno == oggi
-    val aperta = eOggi && (g.inCorso || g.inPausa)  // oggi non ancora finita: il totale vale "finora"
-    val c0 = g.coppie.getOrNull(0)
-    val c1 = g.coppie.getOrNull(1)
-    // una sola coppia: l'uscita è di fine giornata, salvo oggi se è nella fascia della pausa (si rientrerà)
-    val uscita0 = c0?.uscita
-    val senzaPausa = g.coppie.size == 1 && uscita0 != null &&
-        !(eOggi && uscitaDiPausa(g.giorno, uscita0.quando.toLocalTime()))
-    val entrata = c0?.entrata
-    val uscitaPausa = if (senzaPausa) null else c0?.uscita
-    val rientro = c1?.entrata
-    val uscitaFinale = if (senzaPausa) c0?.uscita else c1?.uscita
-    val altre = g.coppie.drop(2).flatMap { listOfNotNull(it.entrata, it.uscita) }
+    val aperta = eOggi && (g.inCorso || g.inPausa || g.fuori != null)  // oggi non ancora finita: il totale vale "finora"
+    // l'ultima uscita di oggi aspetta il rientro: con la causale (servizio, visita), o la prima nella fascia della pausa
+    val ultima = g.coppie.lastOrNull()?.uscita?.takeIf { it == g.segni.lastOrNull() }
+    val inAttesa = ultima != null && eOggi &&
+        (ultima.causale != null || (g.inPausa && uscitaDiPausa(g.giorno, ultima.quando.toLocalTime())))
+    val entrata = g.coppie.firstOrNull()?.entrata
+    // la pausa è la prima uscita senza causale con il suo rientro; quelle di servizio e per visita hanno la loro riga
+    val pausa = g.intervalli.firstOrNull { it.causale == null }
+    val uscitaPausa = pausa?.uscita ?: ultima?.takeIf { inAttesa && it.causale == null }
+    val fuori = g.intervalli.filter { it.causale != null }
+    val fuoriOra = ultima?.takeIf { inAttesa && it.causale != null }
+    val uscitaFinale = if (inAttesa) null else g.coppie.lastOrNull()?.uscita
+    val senzaPausa = uscitaPausa == null && uscitaFinale != null
+    // il resto (altre uscite, anomalie) in ordine, perché nessuna timbratura resti fuori dalla scheda
+    val mostrate = buildSet {
+        listOfNotNull(entrata, uscitaPausa, pausa?.rientro, fuoriOra, uscitaFinale).forEach(::add)
+        fuori.forEach { add(it.uscita); add(it.rientro) }
+    }
+    val altre = g.segni.filter { it !in mostrate }
     val saldo = ore.saldoMin
     val descrizione = "${g.giorno.nomeGiorno()} ${g.giorno.dayOfMonth} ${g.giorno.nomeMese()}, ${Ore.durata(ore.lavoratiMin)} " +
         (if (aperta) "finora" else "valide") + (saldo?.let { ", saldo ${Ore.saldo(it)}" } ?: "")
@@ -597,27 +605,31 @@ private fun SchedaGiorno(
             ) { Text("i", style = Testo.Corpo15.copy(fontWeight = FontWeight.ExtraBold)) }
         }
         BarraGiorno(g, if (aperta) ora else null)
-        Row(verticalAlignment = Alignment.Bottom) {
+        Row(verticalAlignment = Alignment.Top) {  // in alto: la causale sotto l'uscita non sposta le altre colonne
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
                 Text("ENTRATA", style = Testo.Etichetta11.copy(color = Colori.Entrata))
                 OraTimbratura(entrata, Tipo.ENTRATA, grande = true, filtro, onApri)
+                entrata?.causale?.let { EtichettaCausale(it) }
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                val pausa = g.pausa?.let { " ${it.primi()}" } ?: ""
-                Text(if (senzaPausa) "SENZA PAUSA" else "PAUSA$pausa", style = Testo.Etichetta11.copy(color = Colori.Testo2))
+                val durata = pausa?.durata?.let { " ${it.primi()}" } ?: ""
+                Text(if (senzaPausa) "SENZA PAUSA" else "PAUSA$durata", style = Testo.Etichetta11.copy(color = Colori.Testo2))
                 if (!senzaPausa) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                         OraTimbratura(uscitaPausa, Tipo.USCITA, grande = false, filtro, onApri)
                         Text("›", style = Testo.Corpo14.copy(color = Colori.Disattivo))
-                        OraTimbratura(rientro, Tipo.ENTRATA, grande = false, filtro, onApri)
+                        OraTimbratura(pausa?.rientro, Tipo.ENTRATA, grande = false, filtro, onApri)
                     }
                 }
             }
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
                 Text("USCITA", style = Testo.Etichetta11.copy(color = Colori.Uscita))
                 OraTimbratura(uscitaFinale, Tipo.USCITA, grande = true, filtro, onApri)
+                uscitaFinale?.causale?.let { EtichettaCausale(it) }
             }
         }
+        fuori.forEach { RigaFuori(it.causale!!, it.uscita, it.rientro, it.durata.primi(), filtro, onApri) }
+        fuoriOra?.let { RigaFuori(it.causale!!, it, null, "in corso", filtro, onApri) }
         if (altre.isNotEmpty()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("ALTRE", style = Testo.Etichetta11.copy(color = Colori.Testo2), modifier = Modifier.padding(end = 6.dp))
@@ -703,12 +715,47 @@ private fun DettaglioOre(
     )
 }
 
-/** Barra 7-18 con i periodi lavorati (menta → arancio); quello in corso tratteggiato fino ad adesso. */
+/** Sotto l'entrata o l'uscita della giornata, se ha la causale (es. visita medica a fine giornata, senza rientro). */
+@Composable
+private fun EtichettaCausale(c: Causale) =
+    Text(c.nome.uppercase(Locale.ITALIAN), style = Testo.Etichetta11.copy(color = Colori.Fuori), modifier = Modifier.padding(horizontal = 5.dp))
+
+/** Uscita di servizio o per visita medica con il rientro (o "in corso"): il tempo fuori, che conta come presenza. */
+@Composable
+private fun RigaFuori(causale: Causale, uscita: Timbratura, rientro: Timbratura?, durata: String, filtro: Filtro, onApri: (Int) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(causale.nome.uppercase(Locale.ITALIAN), style = Testo.Etichetta11.copy(color = Colori.Fuori), modifier = Modifier.padding(end = 3.dp))
+        OraTimbratura(uscita, Tipo.USCITA, grande = false, filtro, onApri)
+        Text("›", style = Testo.Corpo14.copy(color = Colori.Disattivo))
+        OraTimbratura(rientro, Tipo.ENTRATA, grande = false, filtro, onApri)
+        Text("· $durata in presenza", style = Testo.Piccolo12.copy(color = Colori.Fuori, fontWeight = FontWeight.SemiBold))
+    }
+}
+
+/**
+ * Barra 7-18 con i periodi lavorati (menta → arancio); quello in corso tratteggiato fino ad adesso. Il tempo fuori per
+ * servizio o per visita medica in lilla, tratteggiato se si è ancora fuori.
+ */
 @Composable
 private fun BarraGiorno(g: Giornata<Timbratura>, ora: LocalDateTime?) {
     Canvas(Modifier.fillMaxWidth().height(12.dp)) {
         val r = CornerRadius(size.height / 2)
         drawRoundRect(Colori.Rilievo, cornerRadius = r)
+        fun tratto(da: LocalDateTime, a: LocalDateTime, colore: Color, pieno: Boolean) {
+            val x0 = frazione(da.toLocalTime()) * size.width
+            val x1 = maxOf(frazione(a.toLocalTime()) * size.width, x0 + 4.dp.toPx())
+            if (pieno) {
+                drawRoundRect(colore, topLeft = Offset(x0, 0f), size = Size(x1 - x0, size.height), cornerRadius = r)
+                return
+            }
+            var x = x0
+            while (x < x1) {
+                drawRoundRect(colore, topLeft = Offset(x, 0f), size = Size(minOf(6.dp.toPx(), x1 - x), size.height), cornerRadius = CornerRadius(2.dp.toPx()))
+                x += 10.dp.toPx()
+            }
+        }
+        g.intervalli.filter { it.causale != null }.forEach { tratto(it.uscita.quando, it.rientro.quando, Colori.Fuori, pieno = true) }
+        if (g.fuori != null && ora != null) g.segni.lastOrNull()?.let { tratto(it.quando, ora, Colori.Fuori, pieno = false) }
         g.coppie.forEach { c ->
             val inizio = c.entrata?.quando ?: return@forEach
             val fine = c.uscita?.quando ?: ora ?: return@forEach
@@ -760,7 +807,7 @@ private fun OraTimbratura(t: Timbratura?, tipo: Tipo, grande: Boolean, filtro: F
             )
             .clickable(role = Role.Button) { onApri(t.id) }
             .semantics(mergeDescendants = true) {
-                contentDescription = "${t.tipo.etichetta} ${t.quando.oraMinuti()}" + segni.joinToString("") { ", $it" }
+                contentDescription = "${t.etichetta} ${t.quando.oraMinuti()}" + segni.joinToString("") { ", $it" }
             }
             .padding(horizontal = 5.dp, vertical = 1.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -844,8 +891,9 @@ fun DettaglioScreen(
                 Text(t.tipo.etichetta.uppercase(Locale.ITALIAN), style = Testo.Titolo28.copy(color = t.tipo.colore))
                 Text(t.quando.oraMinuti(), style = Testo.Mono21.copy(fontSize = 28.sp, lineHeight = 32.sp))
             }
-            if (t.contestata || t.daTenere || t.videoEliminato || t.stato == StatoInvio.IN_INVIO) {
+            if (t.causale != null || t.contestata || t.daTenere || t.videoEliminato || t.stato == StatoInvio.IN_INVIO) {
                 Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    t.causale?.let { Badge(it.spunta, Colori.SuColore, Colori.Fuori) }
                     if (t.contestata) Badge("Contestata", Colori.SuColore, Colori.Giallo)
                     if (t.daTenere) Badge("Da tenere", Colori.SuColore, Colori.Azzurro)
                     if (t.stato == StatoInvio.IN_INVIO) Badge("In invio", Colori.Giallo, Colori.ContestataChiaro)
@@ -942,6 +990,17 @@ fun DettaglioScreen(
                     t.daTenere, { v -> esegui(Lavoro.FLAG, { vm.modifica(t, ModificaTimbratura(keep = v), firmatario) }) }, Colori.Azzurro,
                     abilitata = gestibile,
                 )
+                // causale: una sola alla volta; "" la toglie. Cambia il calcolo delle ore, non la timbratura firmata
+                Causale.entries.forEach { c ->
+                    RigaSpunta(
+                        c.etichetta(t.kind).replaceFirstChar { it.uppercase() },
+                        "Il tempo fuori conta come presenza · non cambia la timbratura firmata",
+                        t.causale == c,
+                        { v -> esegui(Lavoro.FLAG, { vm.modifica(t, ModificaTimbratura(reason = if (v) c.codice else ""), firmatario) }) },
+                        Colori.Fuori,
+                        abilitata = gestibile,
+                    )
+                }
                 if (d != null) {
                     CampoTesto("Giustificativo presentato", giustificativo, { if (it.length <= Gestione.MAX_GIUSTIFICATIVO) giustificativo = it })
                     CampoTesto("Note", note, { if (it.length <= Gestione.MAX_NOTE) note = it }, righe = 3)
@@ -1262,7 +1321,7 @@ fun CondividiScreen(vm: StatoApp, ids: List<Int>, onIndietro: () -> Unit) {
             scelte.forEach { t ->
                 Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        "${t.quando.toLocalDate().settimana().replaceFirstChar { it.uppercase() }} ${t.quando.toLocalDate().giornoMese()} · ${t.tipo.etichetta}",
+                        "${t.quando.toLocalDate().settimana().replaceFirstChar { it.uppercase() }} ${t.quando.toLocalDate().giornoMese()} · ${t.etichetta}",
                         style = Testo.Corpo14, modifier = Modifier.weight(1f),
                     )
                     Text(t.quando.oraMinuti(), style = Testo.Mono14.copy(color = t.tipo.colore))
