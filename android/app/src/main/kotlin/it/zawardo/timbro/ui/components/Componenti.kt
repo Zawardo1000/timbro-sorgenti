@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -244,42 +243,6 @@ fun RigaSpunta(
                 disabledCheckedColor = coloreSpunta.copy(alpha = 0.5f), disabledUncheckedColor = Colori.Disattivo,
             ),
         )
-    }
-}
-
-/** Interruttore giallo del canvas (56×34): la sveglia del rientro. Lo stato lo annuncia la riga (role Switch). */
-@Composable
-fun Interruttore(acceso: Boolean) {
-    Box(
-        Modifier.size(56.dp, 34.dp).background(if (acceso) Colori.Giallo else Colori.BordoControllo, RoundedCornerShape(17.dp)),
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        Box(
-            Modifier.offset(x = if (acceso) 26.dp else 4.dp).size(26.dp)
-                .background(if (acceso) Colori.SuColore else Colori.Testo2, CircleShape),
-        )
-    }
-}
-
-/** Scheda "Sveglia per il rientro" con la campanella e l'interruttore, a tutta riga. */
-@Composable
-fun SchedaSveglia(titolo: String, spiegazione: String, accesa: Boolean, onCambia: (Boolean) -> Unit, modifier: Modifier = Modifier) {
-    Row(
-        modifier
-            .fillMaxWidth()
-            .clip(Forma22)
-            .background(Colori.Superficie, Forma22)
-            .toggleable(value = accesa, role = Role.Switch, onValueChange = onCambia)
-            .padding(start = 16.dp, end = 14.dp, top = 12.dp, bottom = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Icon(Icone.Campanella, contentDescription = null, tint = if (accesa) Colori.Giallo else Colori.Disattivo, modifier = Modifier.size(24.dp))
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(titolo, style = Testo.Corpo15.copy(fontWeight = FontWeight.ExtraBold))
-            Text(spiegazione, style = Testo.Piccolo12.copy(fontWeight = FontWeight.SemiBold))
-        }
-        Interruttore(accesa)
     }
 }
 

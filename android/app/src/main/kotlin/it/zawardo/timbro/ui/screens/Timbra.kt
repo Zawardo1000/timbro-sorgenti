@@ -64,9 +64,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
@@ -110,7 +113,6 @@ import it.zawardo.timbro.ui.components.Icone
 import it.zawardo.timbro.ui.components.Passo
 import it.zawardo.timbro.ui.components.RigaDato
 import it.zawardo.timbro.ui.components.Scheda
-import it.zawardo.timbro.ui.components.SchedaSveglia
 import it.zawardo.timbro.ui.components.Spazio
 import it.zawardo.timbro.ui.contoAllaRovescia
 import it.zawardo.timbro.ui.oraMinuti
@@ -258,28 +260,33 @@ fun TimbraScreen(
             )
             Spacer(Modifier.weight(1f).heightIn(min = 18.dp))
             Column(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                SceltaCausale(tipo, causale, onCausale)
-                when {
-                    bloccoPausa -> SchedaSveglia(
-                        titolo = if (svegliaAlle != null) "Sveglia alle ${svegliaAlle.oraMinuti()}" else "Sveglia spenta",
-                        spiegazione = if (svegliaAlle != null) "Suona alla fine della pausa minima" else "Nessun avviso a fine pausa",
-                        accesa = svegliaAlle != null,
-                        onCambia = onSvegliaPausa,
+                // la sveglia nella riga dei pulsanti: sull'uscita quella da programmare, nella pausa quella programmata
+                val tondoSveglia = when {
+                    bloccoPausa -> TondoSveglia(
+                        if (svegliaAlle != null) StatoTondo.ACCESO else StatoTondo.SPENTO, svegliaAlle,
+                        if (svegliaAlle != null) "La sveglia suona alla fine della pausa minima" else "Sveglia spenta · nessun avviso a fine pausa",
+                        onSvegliaPausa,
                     )
-                    tipo == Tipo.USCITA && uscitaPausa == null && causale == null -> SchedaSveglia(
-                        titolo = "Sveglia per il rientro",
-                        spiegazione = when {
-                            svegliaUscita && giornata.uscite == 0 -> "Suona alle ${Sveglia.alle(ora).oraMinuti()}, 15 min dopo questa uscita · prima uscita di oggi"
-                            svegliaUscita -> "Suona alle ${Sveglia.alle(ora).oraMinuti()}, 15 min dopo questa uscita"
-                            giornata.uscite > 0 -> "Spenta · alla seconda uscita del giorno è spenta di default"
-                            !vm.conPausa(oggi) -> "Spenta · oggi l'orario non prevede la pausa"
-                            !vm.uscitaDiPausa(oggi, ora.toLocalTime()) -> "Spenta · fuori dalla fascia della pausa: è l'uscita di fine giornata"
-                            else -> "Spenta"
+                    tipo == Tipo.USCITA && uscitaPausa == null -> TondoSveglia(
+                        when {
+                            causale != null -> StatoTondo.NON_SERVE
+                            svegliaUscita -> StatoTondo.ACCESO
+                            else -> StatoTondo.SPENTO
                         },
-                        accesa = svegliaUscita,
-                        onCambia = onSveglia,
+                        Sveglia.alle(ora),
+                        when {
+                            svegliaUscita && giornata.uscite == 0 -> "La sveglia suona alle ${Sveglia.alle(ora).oraMinuti()}, 15 min dopo questa uscita · prima uscita di oggi"
+                            svegliaUscita -> "La sveglia suona alle ${Sveglia.alle(ora).oraMinuti()}, 15 min dopo questa uscita"
+                            giornata.uscite > 0 -> "Sveglia spenta · alla seconda uscita del giorno è spenta di default"
+                            !vm.conPausa(oggi) -> "Sveglia spenta · oggi l'orario non prevede la pausa"
+                            !vm.uscitaDiPausa(oggi, ora.toLocalTime()) -> "Sveglia spenta · fuori dalla fascia della pausa: è l'uscita di fine giornata"
+                            else -> "Sveglia spenta"
+                        },
+                        onSveglia,
                     )
+                    else -> null
                 }
+                PulsantiRapidi(tipo, tondoSveglia, causale, onCausale)
                 vm.ultima()?.let { u -> if (uscitaPausa != null) UltimaBreve(u) else UltimaConCatena(u) }
             }
         }
@@ -322,50 +329,141 @@ private fun minutiFuori(da: LocalDateTime, ora: LocalDateTime): String {
 /** Nome della spunta: "Di servizio" vale per l'uscita e per il rientro. */
 internal val Causale.spunta: String get() = if (this == Causale.SERVIZIO) "Di servizio" else "Visita medica"
 
+private enum class StatoTondo { ACCESO, SPENTO, NON_SERVE }
+
+/** Il tondo della sveglia: [ora] quella che suonerà (o suona), [spiegazione] la riga sotto i pulsanti. */
+private class TondoSveglia(val stato: StatoTondo, val ora: LocalDateTime?, val spiegazione: String, val onCambia: (Boolean) -> Unit)
+
 /**
- * Le due spunte della causale, spente di default e una sola alla volta (toccare quella accesa la spegne). Sotto, quando
- * una è accesa, cosa cambia: niente sveglia, il tempo fuori conta come presenza.
+ * Pulsanti rotondi, come le impostazioni rapide di Android (proposta D del canvas "Timbro – interruttori causale"):
+ * sveglia (sull'uscita e nella pausa), uscita di servizio e visita medica. La causale è una sola alla volta (toccare
+ * quella accesa la spegne) e con la causale la sveglia non serve. Sotto, una riga dice cosa succede.
  */
 @Composable
-private fun SceltaCausale(tipo: Tipo, causale: Causale?, onCausale: (Causale?) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+private fun PulsantiRapidi(tipo: Tipo, sveglia: TondoSveglia?, causale: Causale?, onCausale: (Causale?) -> Unit) {
+    Column(
+        Modifier.fillMaxWidth().background(Colori.Superficie, Forma22).padding(start = 8.dp, end = 8.dp, top = 10.dp, bottom = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(Modifier.fillMaxWidth()) {
+            sveglia?.let { s ->
+                Tondo(
+                    icona = if (s.stato == StatoTondo.NON_SERVE) Icone.CampanellaSpenta else Icone.Campanella,
+                    nome = "Sveglia",
+                    stato = when (s.stato) {
+                        StatoTondo.ACCESO -> s.ora?.oraMinuti() ?: "accesa"
+                        StatoTondo.SPENTO -> "spenta"
+                        StatoTondo.NON_SERVE -> "non serve"
+                    },
+                    coloreStato = when (s.stato) {
+                        StatoTondo.ACCESO -> Colori.Giallo
+                        StatoTondo.SPENTO -> Colori.Testo2
+                        StatoTondo.NON_SERVE -> Colori.Disattivo
+                    },
+                    statoMono = s.stato == StatoTondo.ACCESO && s.ora != null,
+                    acceso = s.stato == StatoTondo.ACCESO,
+                    colore = Colori.Giallo,
+                    alone = false,
+                    abilitato = s.stato != StatoTondo.NON_SERVE,
+                    descrizione = "Sveglia per il rientro",
+                    onCambia = s.onCambia,
+                    modifier = Modifier.weight(1f),
+                )
+            }
             Causale.entries.forEach { c ->
-                SpuntaCausale(c, causale == c, Modifier.weight(1f)) { accesa -> onCausale(if (accesa) c else null) }
+                Tondo(
+                    icona = if (c == Causale.SERVIZIO) Icone.Valigetta else Icone.Croce,
+                    nome = c.spunta,
+                    stato = if (causale == c) "sì" else "no",
+                    coloreStato = if (causale == c) Colori.Fuori else Colori.Testo2,
+                    statoMono = false,
+                    acceso = causale == c,
+                    colore = Colori.Fuori,
+                    alone = true,
+                    abilitato = true,
+                    descrizione = c.etichetta(tipo.kind).replaceFirstChar { it.uppercase() },
+                    onCambia = { acceso -> onCausale(if (acceso) c else null) },
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
-        if (causale != null) {
+        val riga = when {
+            causale != null && tipo == Tipo.USCITA -> "Il tempo fuori conta come presenza fino al rientro" to Colori.Fuori
+            causale != null -> "Rientro: il tempo fuori conta come presenza" to Colori.Fuori
+            sveglia != null -> sveglia.spiegazione to Colori.Testo2
+            else -> null
+        }
+        riga?.let { (testo, colore) ->
             Text(
-                if (tipo == Tipo.USCITA) "Il tempo fuori conta come presenza · niente sveglia"
-                else "Rientro: il tempo fuori conta come presenza",
-                style = Testo.Piccolo12.copy(color = Colori.Fuori, fontWeight = FontWeight.SemiBold),
-                modifier = Modifier.padding(start = 4.dp),
+                testo, style = Testo.Piccolo12.copy(color = colore, fontWeight = FontWeight.SemiBold), textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
             )
         }
     }
 }
 
+/** Un pulsante rotondo con il nome e lo stato sotto; acceso pieno nel suo [colore], "non serve" tratteggiato. */
 @Composable
-private fun SpuntaCausale(c: Causale, accesa: Boolean, modifier: Modifier, onCambia: (Boolean) -> Unit) {
-    val forma = RoundedCornerShape(18.dp)
-    val quadrato = RoundedCornerShape(6.dp)
-    Row(
-        modifier.heightIn(min = 56.dp).clip(forma)
-            .background(if (accesa) Colori.Fuori else Colori.Superficie, forma)
-            .toggleable(value = accesa, role = Role.Checkbox, onValueChange = onCambia)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+private fun Tondo(
+    icona: ImageVector,
+    nome: String,
+    stato: String,
+    coloreStato: Color,
+    statoMono: Boolean,
+    acceso: Boolean,
+    colore: Color,
+    alone: Boolean,
+    abilitato: Boolean,
+    descrizione: String,
+    onCambia: (Boolean) -> Unit,
+    modifier: Modifier,
+) {
+    val coloreAlone = colore.copy(alpha = 0.25f)
+    Column(
+        modifier.clip(RoundedCornerShape(18.dp))
+            .toggleable(value = acceso, enabled = abilitato, role = Role.Switch, onValueChange = onCambia)
+            .semantics(mergeDescendants = true) { contentDescription = "$descrizione, $stato" }
+            .padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Box(
-            Modifier.size(22.dp).then(
-                if (accesa) Modifier.background(Colori.SuColore, quadrato) else Modifier.border(2.dp, Colori.Disattivo, quadrato),
-            ),
+            Modifier.size(64.dp)
+                .drawBehind {
+                    val r = size.minDimension / 2
+                    when {
+                        acceso && alone -> drawCircle(coloreAlone, radius = r + 6.dp.toPx())
+                        !abilitato -> {
+                            val s = 2.dp.toPx()
+                            drawCircle(
+                                Colori.BordoControllo, radius = r - s / 2,
+                                style = Stroke(s, pathEffect = PathEffect.dashPathEffect(floatArrayOf(5.dp.toPx(), 4.dp.toPx()))),
+                            )
+                        }
+                    }
+                }
+                .then(if (abilitato) Modifier.background(if (acceso) colore else Colori.Rilievo, CircleShape) else Modifier),
             contentAlignment = Alignment.Center,
         ) {
-            if (accesa) Icon(Icone.Fatto, contentDescription = null, tint = Colori.Fuori, modifier = Modifier.size(16.dp))
+            Icon(
+                icona, contentDescription = null, modifier = Modifier.size(26.dp),
+                tint = when {
+                    !abilitato -> Colori.Disattivo
+                    acceso -> Colori.SuColore
+                    else -> Colori.Inchiostro
+                },
+            )
         }
-        Text(c.spunta, style = Testo.Corpo15.copy(fontWeight = FontWeight.ExtraBold, color = if (accesa) Colori.SuColore else Colori.Inchiostro))
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                nome, textAlign = TextAlign.Center,
+                style = Testo.Piccolo13.copy(fontWeight = FontWeight.Bold, color = if (abilitato) Colori.Inchiostro else Colori.Testo2),
+            )
+            Text(
+                stato,
+                style = (if (statoMono) Testo.Mono14 else Testo.Piccolo12.copy(fontWeight = FontWeight.SemiBold)).copy(color = coloreStato),
+            )
+        }
     }
 }
 

@@ -53,6 +53,14 @@ object Icone {
     val Wifi = contorno("wifi", 1.8f, "M5 9.5a10 10 0 0 1 14 0M7.8 12.6a6 6 0 0 1 8.4 0M10.6 15.6a2 2 0 0 1 2.8 0", "M12 18.5v.01")
     // stile C: sveglia del rientro, esiti della catena di stato
     val Campanella = contorno("campanella", 2.2f, "M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z", "M10 20a2 2 0 0 0 4 0")
+    val CampanellaSpenta = contorno("campanella-spenta", 2.2f, "M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z", "M10 20a2 2 0 0 0 4 0", "M4 4l16 16")
+
+    // causali: uscita di servizio (valigetta) e visita medica (croce)
+    val Valigetta = contorno(
+        "valigetta", 2f, "M5 7h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-14a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2z",
+        "M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2", "M3 13h18",
+    )
+    val Croce = contorno("croce", 2f, "M9.5 3.5h5v6h6v5h-6v6h-5v-6h-6v-5h6z")
     val FattoGrosso = contorno("fatto-grosso", 3f, "M5 12l5 5 9-10")
     val Orologio = contorno("orologio", 3f, "M12 7v5l3 2")
     val Avviso = contorno("avviso", 3f, "M12 7v6", "M12 17v.01")
