@@ -159,9 +159,10 @@ private fun adesso(): LocalDateTime {
  * la giornata: niente Pausa e sveglia spenta di default. Il tipo si fissa al tocco di Registra; la data e la proposta
  * seguono l'ora, anche a mezzanotte.
  *
- * Due spunte, spente di default, dichiarano la causale: uscita di servizio o per visita medica (il tempo fuori conta
- * come presenza). Dopo un'uscita con la causale la schermata propone il RIENTRO con la stessa spunta accesa, senza
- * sveglia né pausa minima. La causale non entra nella timbratura firmata: si cambia dopo dallo Storico.
+ * Sulle uscite due pulsanti, spenti di default, dichiarano la causale: uscita di servizio o per visita medica (il tempo
+ * fuori conta come presenza). Dopo un'uscita con la causale la schermata propone il RIENTRO, che la prende da sola
+ * (sulle entrate i pulsanti non ci sono, come la sveglia), senza sveglia né pausa minima. La causale non entra nella
+ * timbratura firmata: si cambia dopo dallo Storico.
  */
 @Composable
 fun TimbraScreen(
@@ -183,7 +184,9 @@ fun TimbraScreen(
     val giornata = vm.giornata(oggi)
     val proposta = vm.tipoProposto(oggi)
     val tipo = scelta ?: proposta
-    fun causalePer(t: Tipo, giorno: LocalDate) = if (causaleToccata) causaleScelta else vm.causaleProposta(t, giorno)
+    // la causale si sceglie solo sulle uscite; il rientro prende quella dell'uscita di oggi (Proposta.causale)
+    fun causalePer(t: Tipo, giorno: LocalDate) =
+        if (t == Tipo.USCITA && causaleToccata) causaleScelta else vm.causaleProposta(t, giorno)
     val causale = causalePer(tipo, oggi)
     val ultimaDiOggi = giornata.segni.lastOrNull()
     // fuori per servizio o per visita medica: si propone il rientro, il tempo fuori conta già come presenza
@@ -336,11 +339,14 @@ private class TondoSveglia(val stato: StatoTondo, val ora: LocalDateTime?, val s
 
 /**
  * Pulsanti rotondi, come le impostazioni rapide di Android (proposta D del canvas "Timbro – interruttori causale"):
- * sveglia (sull'uscita e nella pausa), uscita di servizio e visita medica. La causale è una sola alla volta (toccare
- * quella accesa la spegne) e con la causale la sveglia non serve. Sotto, una riga dice cosa succede.
+ * sveglia (sull'uscita e nella pausa), uscita di servizio e visita medica (solo sulle uscite: il rientro prende la
+ * causale dell'uscita). La causale è una sola alla volta (toccare quella accesa la spegne) e con la causale la sveglia
+ * non serve. Sotto, una riga dice cosa succede. Su un'entrata fuori dalla pausa non c'è niente da mostrare.
  */
 @Composable
 private fun PulsantiRapidi(tipo: Tipo, sveglia: TondoSveglia?, causale: Causale?, onCausale: (Causale?) -> Unit) {
+    val conCausali = tipo == Tipo.USCITA
+    if (sveglia == null && !conCausali) return
     Column(
         Modifier.fillMaxWidth().background(Colori.Superficie, Forma22).padding(start = 8.dp, end = 8.dp, top = 10.dp, bottom = 14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -370,7 +376,7 @@ private fun PulsantiRapidi(tipo: Tipo, sveglia: TondoSveglia?, causale: Causale?
                     modifier = Modifier.weight(1f),
                 )
             }
-            Causale.entries.forEach { c ->
+            if (conCausali) Causale.entries.forEach { c ->
                 Tondo(
                     icona = if (c == Causale.SERVIZIO) Icone.Valigetta else Icone.Croce,
                     nome = c.spunta,
@@ -388,8 +394,7 @@ private fun PulsantiRapidi(tipo: Tipo, sveglia: TondoSveglia?, causale: Causale?
             }
         }
         val riga = when {
-            causale != null && tipo == Tipo.USCITA -> "Il tempo fuori conta come presenza fino al rientro" to Colori.Fuori
-            causale != null -> "Rientro: il tempo fuori conta come presenza" to Colori.Fuori
+            conCausali && causale != null -> "Il tempo fuori conta come presenza fino al rientro" to Colori.Fuori
             sveglia != null -> sveglia.spiegazione to Colori.Testo2
             else -> null
         }
